@@ -40,10 +40,9 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: Update manifests
+    - name: Build release manifests
       run: |
-        # this is quite naive, but i don't think we need more for now
-        sed -i "s/dev/${TAG}/g" config/default/manager_image_patch.yaml
+        TAG=${{ env.TAG }} make manifest-modification
         kustomize build config/default/ > infrastructure-components.yaml
     - name: Release
       uses: softprops/action-gh-release@v2
