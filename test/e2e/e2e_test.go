@@ -36,7 +36,7 @@ var _ = Describe("CAPMVM", func() {
 	AfterEach(func() {
 		if !mngr.SkipCleanup {
 			framework.DeleteAllClustersAndWait(ctx, framework.DeleteAllClustersAndWaitInput{
-				Client:    mngr.ClusterProxy.GetClient(),
+				// Client:    mngr.ClusterProxy.GetClient(),
 				Namespace: namespace.Name,
 			}, mngr.Cfg.GetIntervals("default", "wait-delete-cluster")...)
 		}
