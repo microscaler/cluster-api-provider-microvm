@@ -26,6 +26,7 @@ func (r *MicrovmMachine) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&infrav1.MicrovmMachine{}).
 		WithValidator(r).
+		WithDefaulter(r, admission.DefaulterRemoveUnknownOrOmitableFields).
 		Complete()
 }
 

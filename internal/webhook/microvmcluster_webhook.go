@@ -26,6 +26,7 @@ func (r *MicrovmCluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&infrav1.MicrovmCluster{}).
 		WithValidator(r).
+		WithDefaulter(r, admission.DefaulterRemoveUnknownOrOmitableFields).
 		Complete()
 }
 
