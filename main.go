@@ -43,6 +43,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	
+	webhookMicro "github.com/liquidmetal-dev/cluster-api-provider-microvm/internal/webhook"
 
 	//+kubebuilder:scaffold:imports
 	infrav1 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha1"
@@ -334,15 +336,15 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager) error {
 }
 
 func setupWebhooks(mgr ctrl.Manager) error {
-	if err := (&infrav1.MicrovmCluster{}).SetupWebhookWithManager(mgr); err != nil {
+	if err := (&webhookMicro.MicrovmCluster{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to setup MicrovmCluster webhook:%w", err)
 	}
 
-	if err := (&infrav1.MicrovmMachine{}).SetupWebhookWithManager(mgr); err != nil {
+	if err := (&webhookMicro.MicrovmMachine{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to setup MicrovmMachine webhook:%w", err)
 	}
 
-	if err := (&infrav1.MicrovmMachineTemplate{}).SetupWebhookWithManager(mgr); err != nil {
+	if err := (&webhookMicro.MicrovmMachineTemplate{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to setup MicrovmMachineTemplate webhook:%w", err)
 	}
 
