@@ -18,14 +18,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/pointer"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	fakeremote "sigs.k8s.io/cluster-api/controllers/remote/fake"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	infrav1 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha1"
+	infrav1alpha2 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha2"
 	"github.com/liquidmetal-dev/cluster-api-provider-microvm/controllers"
 	"github.com/liquidmetal-dev/cluster-api-provider-microvm/controllers/fakes"
 	flintlockv1 "github.com/liquidmetal-dev/flintlock/api/services/microvm/v1alpha1"
@@ -53,10 +54,10 @@ func defaultClusterObjects() clusterObjects {
 }
 
 type clusterObjects struct {
-	Cluster    *clusterv1.Cluster
+	Cluster    *clusterv1beta2.Cluster
 	MvmCluster *infrav1.MicrovmCluster
 
-	Machine    *clusterv1.Machine
+	Machine    *clusterv1beta2.Machine
 	MvmMachine *infrav1.MicrovmMachine
 
 	BootstrapSecret *corev1.Secret
@@ -118,13 +119,13 @@ func reconcileCluster(client client.Client) (ctrl.Result, error) {
 	return clusterController.Reconcile(context.TODO(), request)
 }
 
-func getCluster(ctx context.Context, c client.Client, name, namespace string) (*clusterv1.Cluster, error) {
+func getCluster(ctx context.Context, c client.Client, name, namespace string) (*clusterv1beta2.Cluster, error) {
 	clusterKey := client.ObjectKey{
 		Name:      name,
 		Namespace: namespace,
 	}
 
-	cluster := &clusterv1.Cluster{}
+	cluster := &clusterv1beta2.Cluster{}
 	err := c.Get(ctx, clusterKey, cluster)
 	return cluster, err
 }
@@ -151,13 +152,13 @@ func getMicrovmMachine(c client.Client, name, namespace string) (*infrav1.Microv
 	return machine, err
 }
 
-func getMachine(c client.Client, name, namespace string) (*clusterv1.Machine, error) {
+func getMachine(c client.Client, name, namespace string) (*clusterv1beta2.Machine, error) {
 	clusterKey := client.ObjectKey{
 		Name:      name,
 		Namespace: namespace,
 	}
 
-	machine := &clusterv1.Machine{}
+	machine := &clusterv1beta2.Machine{}
 	err := c.Get(context.TODO(), clusterKey, machine)
 	return machine, err
 }
@@ -166,7 +167,8 @@ func createFakeClient(g *WithT, objects []runtime.Object) client.Client {
 	scheme := runtime.NewScheme()
 
 	g.Expect(infrav1.AddToScheme(scheme)).To(Succeed())
-	g.Expect(clusterv1.AddToScheme(scheme)).To(Succeed())
+	g.Expect(infrav1alpha2.AddToScheme(scheme)).To(Succeed())
+	g.Expect(clusterv1beta2.AddToScheme(scheme)).To(Succeed())
 	g.Expect(corev1.AddToScheme(scheme)).To(Succeed())
 
 	return fake.NewClientBuilder().WithScheme(scheme).WithRuntimeObjects(objects...).Build()
@@ -203,24 +205,24 @@ func createMicrovmCluster() *infrav1.MicrovmCluster {
 	}
 }
 
-func createCluster() *clusterv1.Cluster {
-	return &clusterv1.Cluster{
+func createCluster() *clusterv1beta2.Cluster {
+	cp := true
+	return &clusterv1beta2.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testClusterName,
 			Namespace: testClusterNamespace,
 		},
-		Spec: clusterv1.ClusterSpec{
-			InfrastructureRef: &corev1.ObjectReference{
-				Name:      testClusterName,
-				Namespace: testClusterNamespace,
+		Spec: clusterv1beta2.ClusterSpec{
+			InfrastructureRef: clusterv1beta2.ContractVersionedObjectReference{
+				Name: testClusterName,
 			},
 		},
-		Status: clusterv1.ClusterStatus{
-			InfrastructureReady: true,
-			FailureDomains: clusterv1.FailureDomains{
-				"127.0.0.1:9090": clusterv1.FailureDomainSpec{
-					ControlPlane: true,
-				},
+		Status: clusterv1beta2.ClusterStatus{
+			Initialization: clusterv1beta2.ClusterInitializationStatus{
+				InfrastructureProvisioned: pointer.Bool(true),
+			},
+			FailureDomains: []clusterv1beta2.FailureDomain{
+				{Name: "127.0.0.1:9090", ControlPlane: &cp},
 			},
 		},
 	}
@@ -269,23 +271,22 @@ func createMicrovmMachine() *infrav1.MicrovmMachine {
 	}
 }
 
-func createMachine() *clusterv1.Machine {
-	testFailureDomain := "127.0.0.1:9090"
-	return &clusterv1.Machine{
+func createMachine() *clusterv1beta2.Machine {
+	return &clusterv1beta2.Machine{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      testMachineName,
 			Namespace: testClusterNamespace,
 			Labels: map[string]string{
-				clusterv1.ClusterNameLabel: testClusterName,
+				clusterv1beta2.ClusterNameLabel: testClusterName,
 			},
 		},
-		Spec: clusterv1.MachineSpec{
-			ClusterName:   testClusterName,
-			FailureDomain: &testFailureDomain,
-			InfrastructureRef: corev1.ObjectReference{
+		Spec: clusterv1beta2.MachineSpec{
+			ClusterName:     testClusterName,
+			FailureDomain:   "127.0.0.1:9090",
+			InfrastructureRef: clusterv1beta2.ContractVersionedObjectReference{
 				Name: testMachineName,
 			},
-			Bootstrap: clusterv1.Bootstrap{
+			Bootstrap: clusterv1beta2.Bootstrap{
 				DataSecretName: pointer.String(testBootstrapSecretName),
 			},
 		},
@@ -299,7 +300,7 @@ func createBootsrapSecret() *corev1.Secret {
 			Namespace: testClusterNamespace,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: clusterv1.GroupVersion.String(),
+					APIVersion: clusterv1beta2.GroupVersion.String(),
 					Kind:       "Cluster",
 					Name:       testBootstrapSecretName,
 				},
@@ -341,14 +342,15 @@ func withCreateMicrovmSuccess(fc *fakes.FakeClient) {
 	}, nil)
 }
 
-func assertConditionTrue(g *WithT, from conditions.Getter, conditionType clusterv1.ConditionType) {
-	c := conditions.Get(from, conditionType)
+// assertConditionTrue asserts the condition is true using the deprecated v1beta1 getter (v1alpha1 infra uses v1beta2 conditions).
+func assertConditionTrue(g *WithT, from v1beta1conditions.Getter, conditionType clusterv1beta2.ConditionType) {
+	c := v1beta1conditions.Get(from, conditionType)
 	g.Expect(c).ToNot(BeNil(), "Conditions expected to be set")
 	g.Expect(c.Status).To(Equal(corev1.ConditionTrue), "Condition should be marked true")
 }
 
-func assertConditionFalse(g *WithT, from conditions.Getter, conditionType clusterv1.ConditionType, reason string) {
-	c := conditions.Get(from, conditionType)
+func assertConditionFalse(g *WithT, from v1beta1conditions.Getter, conditionType clusterv1beta2.ConditionType, reason string) {
+	c := v1beta1conditions.Get(from, conditionType)
 	g.Expect(c).ToNot(BeNil(), "Conditions expected to be set")
 	g.Expect(c.Status).To(Equal(corev1.ConditionFalse), "Condition should be marked false")
 	g.Expect(c.Reason).To(Equal(reason))
@@ -360,7 +362,7 @@ func assertMachineVMState(g *WithT, machine *infrav1.MicrovmMachine, expectedSta
 }
 
 func assertMachineReconciled(g *WithT, reconciled *infrav1.MicrovmMachine) {
-	assertConditionTrue(g, reconciled, infrav1.MicrovmReadyCondition)
+	assertConditionTrue(g, reconciled, clusterv1beta2.ConditionType(infrav1.MicrovmReadyCondition))
 	assertMachineVMState(g, reconciled, microvm.VMStateRunning)
 	assertMachineFinalizer(g, reconciled)
 	g.Expect(reconciled.Spec.ProviderID).ToNot(BeNil())

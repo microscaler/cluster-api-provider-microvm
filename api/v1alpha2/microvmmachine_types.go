@@ -1,14 +1,12 @@
 // Copyright 2021 Weaveworks or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MPL-2.0
 
-package v1alpha1
+package v1alpha2
 
 import (
 	microvm "github.com/liquidmetal-dev/controller-pkg/types/microvm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
-	// v1beta2 only for Conditions: CAPI v1.11 patch/conditions deprecated helpers require v1beta2.Conditions.
-	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/errors"
 )
 
@@ -84,14 +82,13 @@ type MicrovmMachineStatus struct {
 	// +optional
 	FailureMessage *string `json:"failureMessage,omitempty"`
 
-	// Conditions defines current service state of the MicrovmMachine (v1beta2 type for CAPI patch helper compatibility).
+	// Conditions defines current service state of the MicrovmMachine.
 	// +optional
-	Conditions clusterv1beta2.Conditions `json:"conditions,omitempty"`
+	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:storageversion
 //+k8s:defaulter-gen=true
 
 // MicrovmMachine is the Schema for the microvmmachines API.
@@ -104,22 +101,12 @@ type MicrovmMachine struct {
 }
 
 // GetConditions returns the observations of the operational state of the MicrovmMachine resource.
-func (r *MicrovmMachine) GetConditions() clusterv1beta2.Conditions {
+func (r *MicrovmMachine) GetConditions() clusterv1.Conditions {
 	return r.Status.Conditions
 }
 
-// SetConditions sets the underlying service state of the MicrovmMachine.
-func (r *MicrovmMachine) SetConditions(conditions clusterv1beta2.Conditions) {
-	r.Status.Conditions = conditions
-}
-
-// GetV1Beta1Conditions returns conditions for the deprecated CAPI v1beta1 conditions contract.
-func (r *MicrovmMachine) GetV1Beta1Conditions() clusterv1beta2.Conditions {
-	return r.Status.Conditions
-}
-
-// SetV1Beta1Conditions sets conditions for the deprecated CAPI v1beta1 conditions contract.
-func (r *MicrovmMachine) SetV1Beta1Conditions(conditions clusterv1beta2.Conditions) {
+// SetConditions sets the underlying service state of the MicrovmMachine to the predescribed clusterv1.Conditions.
+func (r *MicrovmMachine) SetConditions(conditions clusterv1.Conditions) {
 	r.Status.Conditions = conditions
 }
 

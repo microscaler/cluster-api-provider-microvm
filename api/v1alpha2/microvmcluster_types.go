@@ -1,15 +1,13 @@
 // Copyright 2021 Weaveworks or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MPL-2.0
 
-package v1alpha1
+package v1alpha2
 
 import (
 	flclient "github.com/liquidmetal-dev/controller-pkg/client"
 	"github.com/liquidmetal-dev/controller-pkg/types/microvm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
-	// v1beta2 only for Conditions: CAPI v1.11 patch/conditions deprecated helpers require v1beta2.Conditions.
-	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // MicrovmClusterSpec defines the desired state of MicrovmCluster.
@@ -84,18 +82,18 @@ type MicrovmClusterStatus struct {
 	// +kubebuilder:default=false
 	Ready bool `json:"ready"`
 
-	// Conditions defines current service state of the MicrovmCluster (v1beta2 type for CAPI patch helper compatibility).
+	// Conditions defines current service state of the MicrovmCluster.
 	// +optional
-	Conditions clusterv1beta2.Conditions `json:"conditions,omitempty"`
+	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 
 	// FailureDomains is a list of the failure domains that CAPI should spread the machines across. For
 	// the CAPMVM provider this equates to host machines that can run microvms using Flintlock.
-	FailureDomains clusterv1.FailureDomains `json:"failureDomains,omitempty"`
+	// v1beta2 uses a slice of FailureDomain; v1beta1 used a map.
+	FailureDomains []clusterv1.FailureDomain `json:"failureDomains,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:storageversion
 // +kubebuilder:resource:path=microvmclusters,scope=Namespaced,categories=cluster-api,shortName=mvmc
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels.cluster\\.x-k8s\\.io/cluster-name",description="Cluster to which this MicrovmCluster belongs"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready",description="Cluster infrastructure is ready"
@@ -112,22 +110,12 @@ type MicrovmCluster struct {
 }
 
 // GetConditions returns the observations of the operational state of the MicrovmCluster resource.
-func (r *MicrovmCluster) GetConditions() clusterv1beta2.Conditions {
+func (r *MicrovmCluster) GetConditions() clusterv1.Conditions {
 	return r.Status.Conditions
 }
 
-// SetConditions sets the underlying service state of the MicrovmCluster.
-func (r *MicrovmCluster) SetConditions(conditions clusterv1beta2.Conditions) {
-	r.Status.Conditions = conditions
-}
-
-// GetV1Beta1Conditions returns conditions for the deprecated CAPI v1beta1 conditions contract.
-func (r *MicrovmCluster) GetV1Beta1Conditions() clusterv1beta2.Conditions {
-	return r.Status.Conditions
-}
-
-// SetV1Beta1Conditions sets conditions for the deprecated CAPI v1beta1 conditions contract.
-func (r *MicrovmCluster) SetV1Beta1Conditions(conditions clusterv1beta2.Conditions) {
+// SetConditions sets the underlying service state of the MicrovmCluster to the predescribed clusterv1.Conditions.
+func (r *MicrovmCluster) SetConditions(conditions clusterv1.Conditions) {
 	r.Status.Conditions = conditions
 }
 

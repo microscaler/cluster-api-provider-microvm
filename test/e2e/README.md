@@ -44,15 +44,22 @@ Ensure you have the following installed:
 
 ## Run the tests
 
-In your CAPMVM repo, save your flintlock server address to a variable and run
-the tests:
+You can either use an existing flintlock server or start one in a container.
+
+**Option 1 – Use a flintlock server** (e.g. already running on the host):
 
 ```bash
-# your flintlock server should be bound to your machine's private address
-# you can get that with hostname
 FL=$(hostname -I | awk '{print $1}')
 make e2e E2E_ARGS="-e2e.flintlock-hosts $FL:9090" # don't forget the port!
 ```
+
+**Option 2 – Use the flintlock API mock** (no external server; mocks the flintlock gRPC API in-process):
+
+```bash
+make e2e-with-flintlock-mock
+```
+
+This runs an in-process mock of the flintlock MicroVM gRPC service so e2e can exercise CAPMVM without a real flintlock/Firecracker stack. The mock implements CreateMicroVM, GetMicroVM, DeleteMicroVM, ListMicroVMs and ListMicroVMsStream with in-memory state. On Linux you may need to set `E2E_FLINTLOCK_HOST` if Kind cannot reach the host at `172.17.0.1`.
 
 _Note: the tests will default to using `192.168.1.15` for the workload cluster's
 load balancer IP. You will need to verify that this is within your network and
@@ -91,11 +98,14 @@ Usage of /home/claudia/workspace/cluster-api-provider-microvm/test/e2e/e2e.test:
   -e2e.capmvm.vip-address string
         Address for the kubevip load balancer. (default "192.168.1.25")
   -e2e.config string
-        Path to e2e config for this suite. (default "config/e2e_conf.yaml")
+        Path to e2e config for this suite. (default "config/e2e_conf_v1beta2.yaml")
+        Use config/e2e_conf.yaml for v1beta1 (not supported with current CAPI test deps).
   -e2e.existing-cluster
         If true, uses the current context for the management cluster and will not create a new one.
   -e2e.flintlock-hosts value
         Comma separated list of addresses to flintlock servers. eg '1.2.3.4:9090,5.6.7.8:9090'
+  -e2e.use-flintlock-mock
+        Run an in-process mock of the flintlock gRPC API (no -e2e.flintlock-hosts needed).
   -e2e.skip-cleanup
         Do not delete test-created workload clusters or the management kind cluster.
 ```
@@ -108,6 +118,29 @@ make e2e E2E_ARGS="-e2e.skip-cleanup"
 
 To use the `e2e.existing-cluster` boolean flag, you will need to ensure that the
 cluster is set as the current context.
+
+### CAPI contract version (v1beta1 vs v1beta2)
+
+The default e2e config uses the **v1beta2** contract (CAPI v1.11.x) so that it matches the CAPI test framework in go.mod (clusterctl v1.11.x only supports v1beta2 management clusters).
+
+| Make target | Config | CAPI version | Contract |
+|-------------|--------|-------------|----------|
+| `make e2e`, `make e2e-with-flintlock-mock`, `make e2e-v1beta2` | `config/e2e_conf_v1beta2.yaml` | v1.11.1 | v1beta2 (default) |
+| `make e2e-v1beta1` | `config/e2e_conf.yaml` | v1.1.5 | v1beta1 (unsupported with current test deps) |
+
+Examples:
+
+```bash
+# v1beta2 (default; use with or without flintlock mock)
+make e2e-with-flintlock-mock
+make e2e E2E_ARGS="-e2e.flintlock-hosts $FL:9090"
+make e2e-v1beta2 E2E_ARGS="-e2e.flintlock-hosts $FL:9090"
+
+# v1beta1 (fails with current CAPI test framework v1.11.1)
+make e2e-v1beta1 E2E_ARGS="-e2e.flintlock-hosts $FL:9090"
+```
+
+To override the config via the flag: `make e2e E2E_ARGS="-e2e.config=config/e2e_conf_v1beta2.yaml -e2e.flintlock-hosts $FL:9090"`.
 
 _Note: `-e2e.flintlock-hosts` and `-e2e.artefact-dir` are already passed to the
 tests as part of the `make` command._

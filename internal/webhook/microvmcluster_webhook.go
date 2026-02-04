@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	infrav1 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha1"
+	infrav1alpha2 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha2"
 )
 
 var _ = logf.Log.WithName("mvmcluster-resource")
@@ -74,6 +75,58 @@ func (r *MicrovmCluster) Default(_ context.Context, obj runtime.Object) error {
 	if !ok {
 		return apierrors.NewBadRequest(fmt.Sprintf("expected a MicrovmCluster but got a %T", obj))
 	}
-	
+
+	return nil
+}
+
+// MicrovmClusterV1alpha2 handles v1alpha2 MicrovmCluster webhooks.
+type MicrovmClusterV1alpha2 struct{}
+
+func (r *MicrovmClusterV1alpha2) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(&infrav1alpha2.MicrovmCluster{}).
+		WithValidator(r).
+		WithDefaulter(r, admission.DefaulterRemoveUnknownOrOmitableFields).
+		Complete()
+}
+
+// +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1alpha2-microvmcluster,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=microvmclusters,versions=v1alpha2,name=validation.microvmcluster.v1alpha2.infrastructure.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1beta1
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-infrastructure-cluster-x-k8s-io-v1alpha2-microvmcluster,mutating=true,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=microvmclusters,versions=v1alpha2,name=default.microvmcluster.v1alpha2.infrastructure.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1beta1
+
+var (
+	_ webhook.CustomValidator = &MicrovmClusterV1alpha2{}
+	_ webhook.CustomDefaulter = &MicrovmClusterV1alpha2{}
+)
+
+func (r *MicrovmClusterV1alpha2) ValidateCreate(_ context.Context, obj runtime.Object) (warnings admission.Warnings, err error) {
+	cluster, ok := obj.(*infrav1alpha2.MicrovmCluster)
+	if !ok {
+		return warnings, apierrors.NewBadRequest(fmt.Sprintf("expected a MicrovmCluster but got %T", obj))
+	}
+	allErrs := cluster.Spec.Placement.Validate()
+	if len(allErrs) > 0 {
+		warnings = append(warnings, fmt.Sprintf("cannot create microvm cluster %s", cluster.GetName()))
+		return warnings, apierrors.NewInvalid(
+			cluster.GroupVersionKind().GroupKind(),
+			cluster.Name,
+			allErrs,
+		)
+	}
+	return warnings, nil
+}
+
+func (r *MicrovmClusterV1alpha2) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+	return nil, nil
+}
+
+func (r *MicrovmClusterV1alpha2) ValidateUpdate(_ context.Context, _ runtime.Object, _ runtime.Object) (admission.Warnings, error) {
+	return nil, nil
+}
+
+func (r *MicrovmClusterV1alpha2) Default(_ context.Context, obj runtime.Object) error {
+	_, ok := obj.(*infrav1alpha2.MicrovmCluster)
+	if !ok {
+		return apierrors.NewBadRequest(fmt.Sprintf("expected a MicrovmCluster but got a %T", obj))
+	}
 	return nil
 }

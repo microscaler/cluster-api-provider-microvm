@@ -1,9 +1,9 @@
 // Copyright 2021 Weaveworks or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MPL-2.0
 
-package v1alpha1
+package v1alpha2
 
-import clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+import clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 // Conditions and reasons for capmvm
 

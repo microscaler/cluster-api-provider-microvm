@@ -1,0 +1,135 @@
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: Cluster
+metadata:
+  name: "${CLUSTER_NAME}"
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - ${POD_CIDR:=172.25.0.0/16}
+    services:
+      cidrBlocks:
+        - ${SERVICES_CIDR:=172.26.0.0/16}
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+    kind: MicrovmCluster
+    name: "${CLUSTER_NAME}"
+  controlPlaneRef:
+    kind: KubeadmControlPlane
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    name: "${CLUSTER_NAME}-control-plane"
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+kind: MicrovmCluster
+metadata:
+  name: "${CLUSTER_NAME}"
+spec:
+  controlPlaneEndpoint:
+    host: "${CONTROL_PLANE_VIP}"
+    port: 6443
+  placement:
+    staticPool:
+      hosts: []
+---
+kind: KubeadmControlPlane
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+metadata:
+  name: "${CLUSTER_NAME}-control-plane"
+spec:
+  replicas: ${CONTROL_PLANE_MACHINE_COUNT}
+  version: "${KUBERNETES_VERSION:=v1.21.8}"
+  machineTemplate:
+    infrastructureRef:
+      kind: MicrovmMachineTemplate
+      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+      name: "${CLUSTER_NAME}-control-plane"
+  kubeadmConfigSpec:
+    initConfiguration:
+      nodeRegistration:
+        kubeletExtraArgs:
+          provider-id: "microvm://{{ ds.meta_data.vm_host }}/{{ ds.meta_data.instance_id }}"
+    clusterConfiguration: {}
+    joinConfiguration:
+      nodeRegistration:
+        kubeletExtraArgs:
+          provider-id: "microvm://{{ ds.meta_data.vm_host }}/{{ ds.meta_data.instance_id }}"
+        ignorePreflightErrors:
+         - DirAvailable--etc-kubernetes-manifests
+    preKubeadmCommands:
+    - mkdir -p /etc/kubernetes/manifests && ctr images pull ghcr.io/kube-vip/kube-vip:v0.4.0 && ctr run --rm --net-host ghcr.io/kube-vip/kube-vip:v0.4.0 vip /kube-vip manifest pod --arp --interface $(ip -4 -j route list default | jq -r .[0].dev) --address ${CONTROL_PLANE_VIP} --controlplane --leaderElection > /etc/kubernetes/manifests/kube-vip.yaml
+---
+kind: MicrovmMachineTemplate
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+metadata:
+  name: "${CLUSTER_NAME}-control-plane"
+spec:
+  template:
+    spec:
+      vcpu: 2
+      memoryMb: 2048
+      rootVolume:
+        id: root
+        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.21.8}"
+      kernel:
+        filename: "boot/vmlinux"
+        image: "${MVM_KERNEL_IMAGE:=ghcr.io/liquidmetal-dev/flintlock-kernel:5.10.77}"
+      kernelCmdline: {}
+      networkInterfaces:
+      - guestDeviceName: "eth1"
+        type: "macvtap"
+---
+apiVersion: cluster.x-k8s.io/v1beta1
+kind: MachineDeployment
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  clusterName: "${CLUSTER_NAME}"
+  replicas: ${WORKER_MACHINE_COUNT}
+  selector:
+    matchLabels:
+  template:
+    spec:
+      clusterName: "${CLUSTER_NAME}"
+      version: "${KUBERNETES_VERSION:=v1.21.8}"
+      bootstrap:
+        configRef:
+          name: "${CLUSTER_NAME}-md-0"
+          apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+          kind: KubeadmConfigTemplate
+      infrastructureRef:
+        name: "${CLUSTER_NAME}-md-0"
+        apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+        kind: MicrovmMachineTemplate
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+kind: MicrovmMachineTemplate
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  template:
+    spec:
+      vcpu: 2
+      memoryMb: 2048
+      rootVolume:
+        id: root
+        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.21.8}"
+      kernel:
+        filename: "boot/vmlinux"
+        image: "${MVM_KERNEL_IMAGE:=ghcr.io/liquidmetal-dev/flintlock-kernel:5.10.77}"
+      kernelCmdline: {}
+      networkInterfaces:
+      - guestDeviceName: "eth1"
+        type: "macvtap"
+---
+apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
+kind: KubeadmConfigTemplate
+metadata:
+  name: "${CLUSTER_NAME}-md-0"
+spec:
+  template:
+    spec:
+      joinConfiguration:
+        nodeRegistration:
+          kubeletExtraArgs:
+            provider-id: "microvm://{{ ds.meta_data.vm_host }}/{{ ds.meta_data.instance_id }}"

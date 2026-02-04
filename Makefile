@@ -74,11 +74,39 @@ test: ## Run tests.
 
 TEST_ARTEFACTS := $(REPO_ROOT)/test/e2e/_artefacts
 E2E_ARGS ?= ""
+# E2E_CONFIG: e2e config file (relative to test/e2e). Default v1beta2 matches CAPI test framework (v1.11.x).
+E2E_CONFIG ?= config/e2e_conf_v1beta2.yaml
+
+# Fail early if e2e is run without flintlock host(s) (avoids cryptic test failure).
+# Use make e2e-with-flintlock-mock to run e2e with an in-process flintlock API mock (no E2E_ARGS needed).
+.PHONY: e2e-check-flintlock
+e2e-check-flintlock:
+	@args="$(strip $(E2E_ARGS))"; \
+	if [ -z "$$args" ]; then \
+		echo "Error: e2e requires at least one flintlock server address, or use the mock option."; \
+		echo "  make e2e E2E_ARGS=\"-e2e.flintlock-hosts \$$FL:9090\""; \
+		echo "  make e2e-with-flintlock-mock   # runs e2e with in-process flintlock API mock"; \
+		exit 1; \
+	fi
 
 .PHONY: e2e
+e2e: e2e-check-flintlock
 e2e: TAG=e2e
-e2e: $(GINKGO) docker-build ## Run end to end test suite.
-	$(GINKGO) -tags=e2e -v -r test/e2e -- -e2e.artefact-dir $(TEST_ARTEFACTS) $(E2E_ARGS)
+e2e: $(GINKGO) docker-build ## Run end to end test suite (default: CAPI v1beta2 config).
+	$(GINKGO) -tags=e2e -v -r test/e2e -- -e2e.artefact-dir $(TEST_ARTEFACTS) -e2e.config=$(E2E_CONFIG) $(E2E_ARGS)
+
+.PHONY: e2e-v1beta1
+e2e-v1beta1: E2E_CONFIG=config/e2e_conf.yaml
+e2e-v1beta1: e2e ## Run e2e with CAPI v1beta1 contract (v1.1.x). Note: fails with current test deps (clusterctl v1.11.x is v1beta2-only).
+
+.PHONY: e2e-v1beta2
+e2e-v1beta2: E2E_CONFIG=config/e2e_conf_v1beta2.yaml
+e2e-v1beta2: e2e ## Run e2e with CAPI v1beta2 contract (v1.11.x).
+
+# Run e2e with in-process flintlock gRPC mock (no external flintlock server required).
+.PHONY: e2e-with-flintlock-mock
+e2e-with-flintlock-mock: E2E_ARGS=-e2e.use-flintlock-mock
+e2e-with-flintlock-mock: e2e ## Run e2e with flintlock API mock (no -e2e.flintlock-hosts needed).
 
 ##@ Binaries
 
@@ -123,6 +151,10 @@ generate-go: $(CONTROLLER_GEN) $(DEFAULTER_GEN) $(COUNTERFEITER)
 
 	$(DEFAULTER_GEN) \
 		./api/v1alpha1 \
+		--v=0 $(GEN_FILE) \
+		--go-header-file=./hack/boilerplate.go.txt
+	$(DEFAULTER_GEN) \
+		./api/v1alpha2 \
 		--v=0 $(GEN_FILE) \
 		--go-header-file=./hack/boilerplate.go.txt
 

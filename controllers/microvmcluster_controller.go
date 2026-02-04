@@ -12,11 +12,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -143,18 +144,18 @@ func (r *MicrovmClusterReconciler) reconcileNormal(
 
 	available := r.isAPIServerAvailable(ctx, cScope)
 	if !available {
-		conditions.MarkFalse(
+		v1beta1conditions.MarkFalse(
 			cScope.MvmCluster,
-			infrav1.LoadBalancerAvailableCondition,
+			clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition),
 			infrav1.LoadBalancerNotAvailableReason,
-			clusterv1.ConditionSeverityInfo,
+			clusterv1beta2.ConditionSeverityInfo,
 			"control plane load balancer isn't available",
 		)
 
 		return reconcile.Result{RequeueAfter: requeuePeriod}, nil
 	}
 
-	conditions.MarkTrue(cScope.MvmCluster, infrav1.LoadBalancerAvailableCondition)
+	v1beta1conditions.MarkTrue(cScope.MvmCluster, clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition))
 
 	return reconcile.Result{}, nil
 }
@@ -242,12 +243,12 @@ func (r *MicrovmClusterReconciler) SetupWithManager(
 		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(mgr.GetScheme(), log, r.WatchFilterValue)).
 		WithEventFilter(predicates.ResourceIsNotExternallyManaged(mgr.GetScheme(), log)).
 		Watches(
-			&clusterv1.Cluster{},
+			&clusterv1beta2.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(
 				util.ClusterToInfrastructureMapFunc(ctx,
 					infrav1.GroupVersion.WithKind("MicrovmCluster"),
 					r.Client,
-					&clusterv1.Cluster{},
+					&clusterv1beta2.Cluster{},
 				),
 			),
 			builder.WithPredicates(
