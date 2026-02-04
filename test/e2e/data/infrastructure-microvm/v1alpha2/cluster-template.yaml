@@ -12,7 +12,7 @@ spec:
       cidrBlocks:
         - ${SERVICES_CIDR:=172.26.0.0/16}
   infrastructureRef:
-    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
     kind: MicrovmCluster
     name: "${CLUSTER_NAME}"
   controlPlaneRef:
@@ -20,7 +20,7 @@ spec:
     apiVersion: controlplane.cluster.x-k8s.io/v1beta1
     name: "${CLUSTER_NAME}-control-plane"
 ---
-apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
 kind: MicrovmCluster
 metadata:
   name: "${CLUSTER_NAME}"
@@ -38,11 +38,11 @@ metadata:
   name: "${CLUSTER_NAME}-control-plane"
 spec:
   replicas: ${CONTROL_PLANE_MACHINE_COUNT}
-  version: "${KUBERNETES_VERSION:=v1.21.8}"
+  version: "${KUBERNETES_VERSION:=v1.23.10}"
   machineTemplate:
     infrastructureRef:
       kind: MicrovmMachineTemplate
-      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+      apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
       name: "${CLUSTER_NAME}-control-plane"
   kubeadmConfigSpec:
     initConfiguration:
@@ -60,7 +60,7 @@ spec:
     - mkdir -p /etc/kubernetes/manifests && ctr images pull ghcr.io/kube-vip/kube-vip:v0.4.0 && ctr run --rm --net-host ghcr.io/kube-vip/kube-vip:v0.4.0 vip /kube-vip manifest pod --arp --interface $(ip -4 -j route list default | jq -r .[0].dev) --address ${CONTROL_PLANE_VIP} --controlplane --leaderElection > /etc/kubernetes/manifests/kube-vip.yaml
 ---
 kind: MicrovmMachineTemplate
-apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
 metadata:
   name: "${CLUSTER_NAME}-control-plane"
 spec:
@@ -70,14 +70,14 @@ spec:
       memoryMb: 2048
       rootVolume:
         id: root
-        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.21.8}"
+        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.23.10}"
       kernel:
         filename: "boot/vmlinux"
         image: "${MVM_KERNEL_IMAGE:=ghcr.io/liquidmetal-dev/flintlock-kernel:5.10.77}"
       kernelCmdline: {}
       networkInterfaces:
       - guestDeviceName: "eth1"
-        type: "macvtap"
+        type: "tap"
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
@@ -91,7 +91,7 @@ spec:
   template:
     spec:
       clusterName: "${CLUSTER_NAME}"
-      version: "${KUBERNETES_VERSION:=v1.21.8}"
+      version: "${KUBERNETES_VERSION:=v1.23.10}"
       bootstrap:
         configRef:
           name: "${CLUSTER_NAME}-md-0"
@@ -99,10 +99,10 @@ spec:
           kind: KubeadmConfigTemplate
       infrastructureRef:
         name: "${CLUSTER_NAME}-md-0"
-        apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+        apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
         kind: MicrovmMachineTemplate
 ---
-apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
 kind: MicrovmMachineTemplate
 metadata:
   name: "${CLUSTER_NAME}-md-0"
@@ -113,14 +113,14 @@ spec:
       memoryMb: 2048
       rootVolume:
         id: root
-        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.21.8}"
+        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.23.10}"
       kernel:
         filename: "boot/vmlinux"
         image: "${MVM_KERNEL_IMAGE:=ghcr.io/liquidmetal-dev/flintlock-kernel:5.10.77}"
       kernelCmdline: {}
       networkInterfaces:
       - guestDeviceName: "eth1"
-        type: "macvtap"
+        type: "tap"
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
 kind: KubeadmConfigTemplate

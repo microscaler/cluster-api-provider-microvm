@@ -1,0 +1,61 @@
+---
+# Variables for Flintlock/containerd-dev host setup (CAPMVM e2e).
+# Override in inventory group_vars or via -e.
+
+# Install containerd and/or Docker via apt when true. If false, host must have
+# containerd (and optionally Docker for Kind) already installed.
+install_containerd: true
+install_docker: false   # set true when Kind/e2e runs on the same host
+
+# Apt packages: Flintlock provision script uses thin-provisioning-tools, lvm2, git, curl, wget;
+# we add dmsetup, bc for devpool; containerd/docker added by install tasks when install_* is true.
+apt_packages_base:
+  - thin-provisioning-tools
+  - lvm2
+  - git
+  - curl
+  - wget
+  - dmsetup
+  - bc
+
+# Network: tap or macvtap (must match cluster template networkInterfaces[].type).
+# - macvtap: use --parent-iface (parent interface; no bridge). Requires Liquid Metal Firecracker fork.
+# - tap: use --bridge-name (host bridge). Works with upstream Firecracker.
+flintlock_network_mode: "macvtap"
+flintlock_parent_iface: "eno4"   # for macvtap
+flintlock_bridge_name: "br-mvm"  # for tap
+
+# Flintlock gRPC
+flintlock_grpc_port: 9090
+flintlock_grpc_endpoint: "0.0.0.0:{{ flintlock_grpc_port }}"
+
+# Containerd-dev (devmapper)
+containerd_dev_socket: "/run/containerd-dev/containerd.sock"
+containerd_dev_root: "/var/lib/containerd-dev"
+containerd_dev_state: "/run/containerd-dev"
+containerd_dev_config_path: "/etc/containerd/config-dev.toml"
+containerd_dev_snapshotter_path: "{{ containerd_dev_root }}/snapshotter/devmapper"
+thinpool_name: "flintlock-dev-thinpool"
+
+# Flintlock binary and service
+flintlockd_bin: "/usr/local/bin/flintlockd"
+flintlockd_dropin_dir: "/etc/systemd/system/flintlockd.service.d"
+flintlockd_dropin_name: "containerd-dev.conf"
+
+# Images to pull into flintlock namespace with ctr (must match cluster templates).
+flintlock_namespace: "flintlock"
+flintlock_root_image: "ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.23.10"
+flintlock_kernel_image: "ghcr.io/liquidmetal-dev/flintlock-kernel:5.10.77"
+# List used for ctr image pulls; add more refs if your templates need them.
+flintlock_ctr_images:
+  - "{{ flintlock_root_image }}"
+  - "{{ flintlock_kernel_image }}"
+
+# Flintlock repo (for provision script)
+flintlock_repo_url: "https://github.com/liquidmetal-dev/flintlock.git"
+flintlock_repo_path: "/tmp/flintlock"
+
+# Paths to repo files: playbook is in hack/ansible/, configs are in hack/.
+# Set in playbook: repo_hack: "{{ playbook_dir }}/.."
+repo_containerd_config: "{{ repo_hack }}/containerd-config-dev.toml"
+repo_containerd_service: "{{ repo_hack }}/containerd-dev.service"

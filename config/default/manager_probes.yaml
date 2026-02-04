@@ -8,6 +8,9 @@ spec:
     spec:
       containers:
       - name: manager
+        readinessProbe:
+          initialDelaySeconds: 20
+          periodSeconds: 10
         livenessProbe:
           failureThreshold: 3
           periodSeconds: 10

@@ -1,0 +1,22 @@
+# Systemd unit for containerd-dev (devmapper snapshotter for Flintlock).
+# Copy to /etc/systemd/system/containerd-dev.service on the Flintlock host.
+[Unit]
+Description=containerd-dev (devmapper for Flintlock)
+Documentation=https://flintlock.liquidmetal.dev/docs/getting-started/containerd/
+After=network.target
+
+[Service]
+ExecStartPre=-/sbin/modprobe dm_thin_pool
+ExecStart=/usr/bin/containerd --config /etc/containerd/config-dev.toml
+Type=simple
+Delegate=yes
+KillMode=process
+Restart=always
+RestartSec=5
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target

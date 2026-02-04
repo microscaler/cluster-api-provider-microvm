@@ -30,3 +30,7 @@ out/
 .vscode/
 .env
 .envrc
+
+# E2E and build artefacts (do not commit)
+make.logs
+_artefacts/

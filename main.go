@@ -35,8 +35,8 @@ import (
 	v1 "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	expclusterv1 "sigs.k8s.io/cluster-api/exp/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/flags"
 	"sigs.k8s.io/cluster-api/util/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -48,16 +48,19 @@ import (
 
 	//+kubebuilder:scaffold:imports
 	infrav1 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha1"
+	infrav1alpha2 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha2"
 	"github.com/liquidmetal-dev/cluster-api-provider-microvm/controllers"
 	"github.com/liquidmetal-dev/cluster-api-provider-microvm/version"
+	conversionwebhook "sigs.k8s.io/controller-runtime/pkg/webhook/conversion"
 )
 
 //nolint:gochecknoinits // Maybe we can remove it, now just ignore.
 func init() {
 	_ = infrav1.AddToScheme(scheme)
+	_ = infrav1alpha2.AddToScheme(scheme)
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = clusterv1.AddToScheme(scheme)
-	_ = expclusterv1.AddToScheme(scheme)
+	_ = clusterv1beta2.AddToScheme(scheme)
 	//+kubebuilder:scaffold:scheme
 
 	_ = "comment can't be at the end of the function"
@@ -287,6 +290,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Register conversion webhook once before setupWebhooks. The builder would register
+	// it for each Convertible type; isAlreadyHandled("/convert") can be false for
+	// later types (e.g. controller-runtime v0.21), so we register first to avoid
+	// "panic: can't register duplicate path: /convert".
+	mgr.GetWebhookServer().Register("/convert", conversionwebhook.NewWebhookHandler(mgr.GetScheme()))
+
 	if err := setupWebhooks(mgr); err != nil {
 		setupLog.Error(err, "failed to add Microvm Webhooks")
 		os.Exit(1)
@@ -339,13 +348,22 @@ func setupWebhooks(mgr ctrl.Manager) error {
 	if err := (&webhookMicro.MicrovmCluster{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to setup MicrovmCluster webhook:%w", err)
 	}
+	if err := (&webhookMicro.MicrovmClusterV1alpha2{}).SetupWebhookWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to setup MicrovmCluster v1alpha2 webhook:%w", err)
+	}
 
 	if err := (&webhookMicro.MicrovmMachine{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to setup MicrovmMachine webhook:%w", err)
 	}
+	if err := (&webhookMicro.MicrovmMachineV1alpha2{}).SetupWebhookWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to setup MicrovmMachine v1alpha2 webhook:%w", err)
+	}
 
 	if err := (&webhookMicro.MicrovmMachineTemplate{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to setup MicrovmMachineTemplate webhook:%w", err)
+	}
+	if err := (&webhookMicro.MicrovmMachineTemplateV1alpha2{}).SetupWebhookWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to setup MicrovmMachineTemplate v1alpha2 webhook:%w", err)
 	}
 
 	return nil

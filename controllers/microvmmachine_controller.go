@@ -16,11 +16,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/utils/ptr"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/collections"
-	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -102,7 +103,7 @@ func (r *MicrovmMachineReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 	mvmCluster := &infrav1.MicrovmCluster{}
 	mvmClusterName := client.ObjectKey{
-		Namespace: cluster.Spec.InfrastructureRef.Namespace,
+		Namespace: cluster.Namespace,
 		Name:      cluster.Spec.InfrastructureRef.Name,
 	}
 
@@ -179,7 +180,7 @@ func (r *MicrovmMachineReconciler) reconcileDelete(
 		machineScope.Info("deleting microvm")
 
 		// Mark the machine as no longer ready before we delete.
-		machineScope.SetNotReady(infrav1.MicrovmDeletingReason, clusterv1.ConditionSeverityInfo, "")
+		machineScope.SetNotReady(infrav1.MicrovmDeletingReason, clusterv1beta2.ConditionSeverityInfo, "")
 
 		if err := machineScope.Patch(); err != nil {
 			machineScope.Error(err, "failed to patch object")
@@ -189,7 +190,7 @@ func (r *MicrovmMachineReconciler) reconcileDelete(
 
 		if microvm.Status.State != flintlocktypes.MicroVMStatus_DELETING {
 			if _, err := mvmSvc.Delete(ctx); err != nil {
-				machineScope.SetNotReady(infrav1.MicrovmDeleteFailedReason, clusterv1.ConditionSeverityError, "")
+				machineScope.SetNotReady(infrav1.MicrovmDeleteFailedReason, clusterv1beta2.ConditionSeverityError, "")
 
 				return ctrl.Result{}, err
 			}
@@ -213,11 +214,12 @@ func (r *MicrovmMachineReconciler) reconcileNormal(
 ) (reconcile.Result, error) {
 	machineScope.Info("Reconciling MicrovmMachine")
 
-	if !machineScope.Cluster.Status.InfrastructureReady {
+	// v1beta2: infrastructure readiness is under Status.Initialization.InfrastructureProvisioned.
+	if !ptr.Deref(machineScope.Cluster.Status.Initialization.InfrastructureProvisioned, false) {
 		machineScope.Info("Cluster infrastructure is not ready")
-		conditions.MarkFalse(
-			machineScope.MvmMachine, infrav1.MicrovmReadyCondition,
-			infrav1.WaitingForClusterInfraReason, clusterv1.ConditionSeverityInfo,
+		v1beta1conditions.MarkFalse(
+			machineScope.MvmMachine, clusterv1beta2.ConditionType(infrav1.MicrovmReadyCondition),
+			infrav1.WaitingForClusterInfraReason, clusterv1beta2.ConditionSeverityInfo,
 			"",
 		)
 
@@ -226,9 +228,9 @@ func (r *MicrovmMachineReconciler) reconcileNormal(
 
 	if machineScope.Machine.Spec.Bootstrap.DataSecretName == nil {
 		machineScope.Info("Bootstrap secret is not ready")
-		conditions.MarkFalse(
-			machineScope.MvmMachine, infrav1.MicrovmReadyCondition,
-			infrav1.WaitingForBootstrapDataReason, clusterv1.ConditionSeverityInfo,
+		v1beta1conditions.MarkFalse(
+			machineScope.MvmMachine, clusterv1beta2.ConditionType(infrav1.MicrovmReadyCondition),
+			infrav1.WaitingForBootstrapDataReason, clusterv1beta2.ConditionSeverityInfo,
 			"",
 		)
 
@@ -347,7 +349,7 @@ func (r *MicrovmMachineReconciler) parseMicroVMState(
 	// MVM IS PENDING
 	case flintlocktypes.MicroVMStatus_PENDING:
 		machineScope.MvmMachine.Status.VMState = &microvm.VMStatePending
-		machineScope.SetNotReady(infrav1.MicrovmPendingReason, clusterv1.ConditionSeverityInfo, "")
+		machineScope.SetNotReady(infrav1.MicrovmPendingReason, clusterv1beta2.ConditionSeverityInfo, "")
 
 		return ctrl.Result{RequeueAfter: requeuePeriod}, nil
 	// MVM IS FAILING
@@ -355,7 +357,8 @@ func (r *MicrovmMachineReconciler) parseMicroVMState(
 		// TODO: we need a failure reason from flintlock: Flintlock #299
 		machineScope.MvmMachine.Status.VMState = &microvm.VMStateFailed
 		machineScope.SetNotReady(infrav1.MicrovmProvisionFailedReason,
-			clusterv1.ConditionSeverityError,
+			clusterv1beta2.ConditionSeverityError,
+			"%s",
 			errMicrovmFailed.Error(),
 		)
 
@@ -370,7 +373,8 @@ func (r *MicrovmMachineReconciler) parseMicroVMState(
 		machineScope.MvmMachine.Status.VMState = &microvm.VMStateUnknown
 		machineScope.SetNotReady(
 			infrav1.MicrovmUnknownStateReason,
-			clusterv1.ConditionSeverityError,
+			clusterv1beta2.ConditionSeverityError,
+			"%s",
 			errMicrovmUnknownState.Error(),
 		)
 
@@ -401,7 +405,7 @@ func (r *MicrovmMachineReconciler) SetupWithManager(
 		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(mgr.GetScheme(), log, r.WatchFilterValue)).
 		WithEventFilter(predicates.ResourceIsNotExternallyManaged(mgr.GetScheme(), log)).
 		Watches(
-			&clusterv1.Machine{},
+			&clusterv1beta2.Machine{},
 			handler.EnqueueRequestsFromMapFunc(
 				util.MachineToInfrastructureMapFunc(infrav1.GroupVersion.WithKind("MicrovmMachine")),
 			),
@@ -411,9 +415,9 @@ func (r *MicrovmMachineReconciler) SetupWithManager(
 			handler.EnqueueRequestsFromMapFunc(r.MicroVMClusterToMicrovmMachine(ctx, log)),
 		).
 		Watches(
-			&clusterv1.Cluster{},
+			&clusterv1beta2.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(clusterToObjectFunc),
-			builder.WithPredicates(predicates.ClusterPausedTransitionsOrInfrastructureReady(mgr.GetScheme(), log)),
+			builder.WithPredicates(predicates.ClusterPausedTransitionsOrInfrastructureProvisioned(mgr.GetScheme(), log)),
 		)
 
 	if err := builder.Complete(r); err != nil {

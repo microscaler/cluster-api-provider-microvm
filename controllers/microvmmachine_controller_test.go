@@ -15,7 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/utils/pointer"
 
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
 
 	"github.com/liquidmetal-dev/controller-pkg/types/microvm"
 	flintlocktypes "github.com/liquidmetal-dev/flintlock/api/types"
@@ -91,7 +91,7 @@ func TestMachineReconcileClusterPaused(t *testing.T) {
 	g := NewWithT(t)
 
 	apiObjects := defaultClusterObjects()
-	apiObjects.Cluster.Spec.Paused = true
+	apiObjects.Cluster.Spec.Paused = pointer.Bool(true)
 
 	client := createFakeClient(g, apiObjects.AsRuntimeObjects())
 	result, err := reconcileMachine(client, nil)
@@ -127,7 +127,7 @@ func TestMachineReconcileClusterInfraNotReady(t *testing.T) {
 	g := NewWithT(t)
 
 	apiObjects := defaultClusterObjects()
-	apiObjects.Cluster.Status.InfrastructureReady = false
+	apiObjects.Cluster.Status.Initialization.InfrastructureProvisioned = pointer.Bool(false)
 
 	client := createFakeClient(g, apiObjects.AsRuntimeObjects())
 	result, err := reconcileMachine(client, nil)
@@ -295,7 +295,7 @@ func TestMachineReconcileNoMachineFailureDomainCreateSucceeds(t *testing.T) {
 
 	apiObjects := defaultClusterObjects()
 	apiObjects.MvmMachine.Spec.ProviderID = nil
-	apiObjects.Machine.Spec.FailureDomain = nil
+	apiObjects.Machine.Spec.FailureDomain = ""
 
 	fakeAPIClient := fakes.FakeClient{}
 	withMissingMicrovm(&fakeAPIClient)

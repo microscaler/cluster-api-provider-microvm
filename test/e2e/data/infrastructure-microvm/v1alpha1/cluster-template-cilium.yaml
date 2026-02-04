@@ -42,7 +42,7 @@ metadata:
   name: "${CLUSTER_NAME}-control-plane"
 spec:
   replicas: ${CONTROL_PLANE_MACHINE_COUNT}
-  version: "${KUBERNETES_VERSION:=v1.21.8}"
+  version: "${KUBERNETES_VERSION:=v1.23.10}"
   machineTemplate:
     infrastructureRef:
       kind: MicrovmMachineTemplate
@@ -74,14 +74,14 @@ spec:
       memoryMb: 2048
       rootVolume:
         id: root
-        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.21.8}"
+        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.23.10}"
       kernel:
         filename: "boot/vmlinux"
         image: "${MVM_KERNEL_IMAGE:=ghcr.io/liquidmetal-dev/flintlock-kernel:5.10.77}"
       kernelCmdline: {}
       networkInterfaces:
       - guestDeviceName: "eth1"
-        type: "macvtap"
+        type: "tap"
 ---
 apiVersion: cluster.x-k8s.io/v1beta1
 kind: MachineDeployment
@@ -95,7 +95,7 @@ spec:
   template:
     spec:
       clusterName: "${CLUSTER_NAME}"
-      version: "${KUBERNETES_VERSION:=v1.21.8}"
+      version: "${KUBERNETES_VERSION:=v1.23.10}"
       bootstrap:
         configRef:
           name: "${CLUSTER_NAME}-md-0"
@@ -117,14 +117,14 @@ spec:
       memoryMb: 2048
       rootVolume:
         id: root
-        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.21.8}"
+        image: "${MVM_ROOT_IMAGE:=ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.23.10}"
       kernel:
         filename: "boot/vmlinux"
         image: "${MVM_KERNEL_IMAGE:=ghcr.io/liquidmetal-dev/flintlock-kernel:5.10.77}"
       kernelCmdline: {}
       networkInterfaces:
       - guestDeviceName: "eth1"
-        type: "macvtap"
+        type: "tap"
 ---
 apiVersion: bootstrap.cluster.x-k8s.io/v1beta1
 kind: KubeadmConfigTemplate

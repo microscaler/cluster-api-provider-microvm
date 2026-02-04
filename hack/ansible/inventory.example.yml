@@ -1,0 +1,14 @@
+# Example Ansible inventory for Flintlock host(s).
+# Copy to inventory.yml and set your host(s).
+#
+# Usage: ansible-playbook -i inventory.yml hack/ansible/playbook.yml
+
+all:
+  children:
+    flintlock_hosts:
+      hosts:
+        flintlock1:
+          ansible_host: 192.168.1.57
+      vars:
+        ansible_user: ubuntu
+        # flintlock_parent_iface: eno4   # override if needed

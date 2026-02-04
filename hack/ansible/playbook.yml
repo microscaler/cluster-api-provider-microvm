@@ -1,0 +1,152 @@
+---
+# Ansible playbook: set up a Linux host as Flintlock/containerd-dev for CAPMVM e2e.
+#
+# Prerequisites on host (when install_containerd/install_docker are false):
+#   - containerd and flintlockd already installed (e.g. from Flintlock docs)
+#   - Firecracker in PATH
+#
+# This playbook: installs apt packages (Flintlock-related + optional containerd/Docker),
+# provisions devmapper thinpool, deploys
+# containerd-dev config and service, configures flintlockd to use containerd-dev,
+# and pre-pulls root/kernel images.
+#
+# Usage:
+#   ansible-playbook -i inventory.yml hack/ansible/playbook.yml
+#   ansible-playbook -i "192.168.1.57," hack/ansible/playbook.yml
+#
+# Optional: set flintlock_network_mode (tap|macvtap), flintlock_parent_iface or flintlock_bridge_name, and flintlock_ctr_images in vars or -e.
+
+- name: Setup Flintlock/containerd-dev host for CAPMVM e2e
+  hosts: flintlock_hosts
+  become: true
+  vars_files:
+    - vars.yml
+  vars:
+    # Playbook lives in hack/ansible/; configs live in hack/
+    repo_hack: "{{ playbook_dir }}/.."
+
+  tasks:
+    - name: Install base apt packages (Flintlock provision deps: thin-provisioning-tools, lvm2, git, curl, wget, dmsetup, bc)
+      ansible.builtin.apt:
+        name: "{{ apt_packages_base }}"
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install containerd (provides /usr/bin/containerd and ctr)
+      ansible.builtin.apt:
+        name: containerd
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian" and install_containerd | default(true) | bool
+
+    - name: Install Docker (for Kind when e2e runs on same host)
+      ansible.builtin.apt:
+        name: docker.io
+        state: present
+        update_cache: true
+      when: ansible_os_family == "Debian" and install_docker | default(false) | bool
+
+    - name: Ensure Docker service is started (when Docker installed)
+      ansible.builtin.systemd:
+        name: docker
+        state: started
+        enabled: true
+      when: install_docker | default(false) | bool
+
+    - name: Ensure containerd-dev directories exist
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - "{{ containerd_dev_snapshotter_path }}"
+        - "{{ containerd_dev_state }}"
+        - "/etc/containerd"
+
+    - name: Clone Flintlock repo (for provision script)
+      ansible.builtin.git:
+        repo: "{{ flintlock_repo_url }}"
+        dest: "{{ flintlock_repo_path }}"
+        depth: 1
+        force: true
+      register: flintlock_clone
+
+    - name: Run provision.sh devpool
+      ansible.builtin.command:
+        cmd: "{{ flintlock_repo_path }}/hack/scripts/provision.sh devpool"
+        creates: "/var/lib/containerd-dev/snapshotter/devmapper/data"
+      changed_when: true
+
+    - name: Deploy containerd-dev config
+      ansible.builtin.copy:
+        src: "{{ repo_containerd_config }}"
+        dest: "{{ containerd_dev_config_path }}"
+        mode: "0644"
+        force: true
+
+    - name: Deploy containerd-dev systemd unit
+      ansible.builtin.copy:
+        src: "{{ repo_containerd_service }}"
+        dest: "/etc/systemd/system/containerd-dev.service"
+        mode: "0644"
+        force: true
+
+    - name: Reload systemd and enable/start containerd-dev
+      ansible.builtin.systemd:
+        name: containerd-dev
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Wait for containerd-dev socket
+      ansible.builtin.wait_for:
+        path: "{{ containerd_dev_socket }}"
+        state: present
+        timeout: 30
+
+    - name: Create flintlockd drop-in directory
+      ansible.builtin.file:
+        path: "{{ flintlockd_dropin_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Deploy flintlockd drop-in (containerd-dev socket + macvtap parent-iface)
+      ansible.builtin.copy:
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart={{ flintlockd_bin }} run --containerd-socket {{ containerd_dev_socket }} --grpc-endpoint {{ flintlock_grpc_endpoint }} --parent-iface {{ flintlock_parent_iface }}
+        dest: "{{ flintlockd_dropin_dir }}/{{ flintlockd_dropin_name }}"
+        mode: "0644"
+        force: true
+      when: flintlock_network_mode == "macvtap"
+
+    - name: Deploy flintlockd drop-in (containerd-dev socket + tap bridge-name)
+      ansible.builtin.copy:
+        content: |
+          [Service]
+          ExecStart=
+          ExecStart={{ flintlockd_bin }} run --containerd-socket {{ containerd_dev_socket }} --grpc-endpoint {{ flintlock_grpc_endpoint }} --bridge-name {{ flintlock_bridge_name }}
+        dest: "{{ flintlockd_dropin_dir }}/{{ flintlockd_dropin_name }}"
+        mode: "0644"
+        force: true
+      when: flintlock_network_mode == "tap"
+
+    - name: Restart flintlockd
+      ansible.builtin.systemd:
+        name: flintlockd
+        state: restarted
+        daemon_reload: true
+
+    - name: Pull images into flintlock namespace with ctr
+      ansible.builtin.command:
+        cmd: >
+          ctr -a {{ containerd_dev_socket }} -n {{ flintlock_namespace }} images pull {{ item }}
+      loop: "{{ flintlock_ctr_images }}"
+      loop_control:
+        label: "{{ item }}"
+      changed_when: true
+      register: pull_images
+      failed_when: false  # may already exist
+

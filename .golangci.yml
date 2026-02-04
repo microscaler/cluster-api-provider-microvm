@@ -87,6 +87,7 @@ issues:
 linters:
   enable-all: true
   disable:
+  - depguard          # avoid "analyzer \"depguard\" has nil Run" so other linters run
   - exhaustivestruct
   - golint
   - interfacer

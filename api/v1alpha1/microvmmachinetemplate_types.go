@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/conversion"
 )
 
 // MicrovmMachineTemplateSpec defines the desired state of MicrovmMachineTemplate.
@@ -24,6 +25,11 @@ type MicrovmMachineTemplate struct {
 
 	Spec MicrovmMachineTemplateSpec `json:"spec,omitempty"`
 }
+
+// Hub marks MicrovmMachineTemplate as the conversion hub (storage version).
+func (*MicrovmMachineTemplate) Hub() {}
+
+var _ conversion.Hub = &MicrovmMachineTemplate{}
 
 //+kubebuilder:object:root=true
 

@@ -72,13 +72,93 @@ lint: $(GOLANGCI_LINT) ## Lint
 test: ## Run tests.
 	go test -v ./controllers/... ./internal/...
 
-TEST_ARTEFACTS := $(REPO_ROOT)/test/e2e/_artefacts
+# E2E artefacts (cluster-template dumps, logs, clusterctl repo) go under ~/flintlock to avoid cluttering the repo.
+TEST_ARTEFACTS := $(HOME)/flintlock/_artefacts
 E2E_ARGS ?= ""
+# E2E_CONFIG: e2e config file (relative to test/e2e). Default v1beta2 matches CAPI test framework (v1.11.x).
+E2E_CONFIG ?= config/e2e_conf_v1beta2.yaml
+
+# Fail early if e2e is run without flintlock host(s) or mock (avoids cryptic test failure).
+# E2E_ARGS must contain either -e2e.flintlock-hosts or -e2e.use-flintlock-mock (e.g. make e2e-with-flintlock-mock).
+.PHONY: e2e-check-flintlock
+e2e-check-flintlock:
+	@args="$(strip $(E2E_ARGS))"; \
+	if echo "$$args" | grep -qE '-e2e\.(flintlock-hosts|use-flintlock-mock)'; then \
+		:; \
+	else \
+		echo "Error: e2e requires at least one flintlock server address, or use the mock option."; \
+		echo "  make e2e E2E_ARGS=\"-e2e.flintlock-hosts \$$FL:9090\""; \
+		echo "  make e2e-with-flintlock-mock   # or add E2E_ARGS=\"-e2e.skip-cleanup\" to keep cluster after run"; \
+		exit 1; \
+	fi
+
+# Optional env vars for e2e-with-flintlock: set E2E_FLINTLOCK_HOSTS and/or E2E_CAPMVM_VIP to avoid passing E2E_ARGS.
+E2E_FLINTLOCK_FROM_ENV := $(if $(E2E_FLINTLOCK_HOSTS),-e2e.flintlock-hosts $(E2E_FLINTLOCK_HOSTS) ,)$(if $(E2E_CAPMVM_VIP),-e2e.capmvm.vip-address=$(E2E_CAPMVM_VIP) ,)
+
+# For e2e-with-flintlock: require real flintlock host(s) and forbid mock so generated templates use real hosts only.
+.PHONY: e2e-check-real-flintlock
+e2e-check-real-flintlock:
+	@args="$(strip $(E2E_ARGS))"; \
+	if echo "$$args" | grep -qE '-e2e\.use-flintlock-mock'; then \
+		echo "Error: e2e-with-flintlock must not use the mock. Do not pass -e2e.use-flintlock-mock."; \
+		echo "  make e2e-with-flintlock E2E_ARGS=\"-e2e.flintlock-hosts <host>:9090 -e2e.capmvm.vip-address=<vip>\""; \
+		exit 1; \
+	fi; \
+	if ! echo "$$args" | grep -qE '-e2e\.flintlock-hosts'; then \
+		echo "Error: e2e-with-flintlock requires -e2e.flintlock-hosts (real flintlock server)."; \
+		echo "  Pass via E2E_ARGS or set env vars: E2E_FLINTLOCK_HOSTS and optionally E2E_CAPMVM_VIP"; \
+		echo "  make e2e-with-flintlock-retain-artifacts E2E_FLINTLOCK_HOSTS=192.168.1.57:9090 E2E_CAPMVM_VIP=172.18.0.1"; \
+		echo "  make e2e-with-flintlock E2E_ARGS=\"-e2e.flintlock-hosts <host>:9090 -e2e.capmvm.vip-address=<vip>\""; \
+		echo "  See test/e2e/README.md for VIP and networking."; \
+		exit 1; \
+	fi
+
+# Rebuild the e2e image with --no-cache so code changes (e.g. webhook fix) are always used.
+.PHONY: docker-build-e2e
+docker-build-e2e: docker-pull-prerequisites ## Build e2e image (no cache) so each e2e run uses current code.
+	docker build --no-cache --build-arg ARCH=$(ARCH) --build-arg LDFLAGS="$(LDFLAGS)" . -t $(CONTROLLER_IMAGE):e2e
 
 .PHONY: e2e
+e2e: e2e-check-flintlock
 e2e: TAG=e2e
-e2e: $(GINKGO) docker-build ## Run end to end test suite.
-	$(GINKGO) -tags=e2e -v -r test/e2e -- -e2e.artefact-dir $(TEST_ARTEFACTS) $(E2E_ARGS)
+e2e: check-e2e-prereqs $(GINKGO) docker-build-e2e ## Run end to end test suite (default: CAPI v1beta2 config).
+	$(GINKGO) -tags=e2e -v -r test/e2e -- -e2e.artefact-dir $(TEST_ARTEFACTS) -e2e.config=$(E2E_CONFIG) $(E2E_ARGS)
+
+.PHONY: e2e-v1beta1
+e2e-v1beta1: E2E_CONFIG=config/e2e_conf.yaml
+e2e-v1beta1: e2e ## Run e2e with CAPI v1beta1 contract (v1.1.x). Note: fails with current test deps (clusterctl v1.11.x is v1beta2-only).
+
+.PHONY: e2e-v1beta2
+e2e-v1beta2: E2E_CONFIG=config/e2e_conf_v1beta2.yaml
+e2e-v1beta2: e2e ## Run e2e with CAPI v1beta2 contract (v1.11.x).
+
+# Run e2e with in-process flintlock gRPC mock (no external flintlock server required).
+# E2E_ARGS is appended so you can add e.g. -e2e.skip-cleanup.
+.PHONY: e2e-with-flintlock-mock
+e2e-with-flintlock-mock: E2E_ARGS := -e2e.use-flintlock-mock $(E2E_ARGS)
+e2e-with-flintlock-mock: e2e ## Run e2e with flintlock API mock (no -e2e.flintlock-hosts needed).
+
+# Same as e2e-with-flintlock-mock but retain Kind cluster and artifacts (skip-cleanup) for inspection.
+.PHONY: e2e-with-flintlock-mock-retain-artifacts
+e2e-with-flintlock-mock-retain-artifacts: E2E_ARGS := -e2e.use-flintlock-mock -e2e.skip-cleanup $(E2E_ARGS)
+e2e-with-flintlock-mock-retain-artifacts: e2e ## Run e2e with flintlock mock and retain cluster/artifacts (~/flintlock/_artefacts).
+
+# Run e2e against real flintlock server(s). No mock; templates use only -e2e.flintlock-hosts.
+# Set E2E_FLINTLOCK_HOSTS (and optionally E2E_CAPMVM_VIP) or pass -e2e.flintlock-hosts in E2E_ARGS (see test/e2e/README.md).
+.PHONY: e2e-with-flintlock
+e2e-with-flintlock: E2E_ARGS := $(E2E_FLINTLOCK_FROM_ENV)$(E2E_ARGS)
+e2e-with-flintlock: e2e-check-real-flintlock
+e2e-with-flintlock: e2e ## Run e2e with real flintlock (E2E_FLINTLOCK_HOSTS=<host>:9090 and optionally E2E_CAPMVM_VIP=<vip>, or pass E2E_ARGS).
+
+# Same as e2e-with-flintlock but retain Kind cluster and artifacts (skip-cleanup) for inspection.
+.PHONY: e2e-with-flintlock-retain-artifacts
+e2e-with-flintlock-retain-artifacts: E2E_ARGS := $(E2E_FLINTLOCK_FROM_ENV)-e2e.skip-cleanup $(E2E_ARGS)
+e2e-with-flintlock-retain-artifacts: e2e-check-real-flintlock
+e2e-with-flintlock-retain-artifacts: e2e ## Run e2e with real flintlock and retain cluster/artifacts (~/flintlock/_artefacts).
+
+.PHONY: check-e2e-prereqs
+check-e2e-prereqs: ## Ensure kustomize is installed (required by CAPI test framework for provider manifests).
+	@command -v kustomize >/dev/null 2>&1 || (echo "kustomize is required for e2e. Install from https://kustomize.io/ or run: go install sigs.k8s.io/kustomize/kustomize/v5@latest"; exit 1)
 
 ##@ Binaries
 
@@ -123,6 +203,10 @@ generate-go: $(CONTROLLER_GEN) $(DEFAULTER_GEN) $(COUNTERFEITER)
 
 	$(DEFAULTER_GEN) \
 		./api/v1alpha1 \
+		--v=0 $(GEN_FILE) \
+		--go-header-file=./hack/boilerplate.go.txt
+	$(DEFAULTER_GEN) \
+		./api/v1alpha2 \
 		--v=0 $(GEN_FILE) \
 		--go-header-file=./hack/boilerplate.go.txt
 
