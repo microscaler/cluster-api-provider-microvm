@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 	infrav1 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha1"
+	infrav1alpha2 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha2"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -75,8 +76,59 @@ func (r *MicrovmMachine) Default(_ context.Context, obj runtime.Object) error {
 	if !ok {
 		return apierrors.NewBadRequest(fmt.Sprintf("expected a MicrovmMachine but got a %T", obj))
 	}
-	
+
 	infrav1.SetObjectDefaults_MicrovmMachine(machine)
-	
+
+	return nil
+}
+
+// MicrovmMachineV1alpha2 handles v1alpha2 MicrovmMachine webhooks.
+type MicrovmMachineV1alpha2 struct{}
+
+func (r *MicrovmMachineV1alpha2) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(&infrav1alpha2.MicrovmMachine{}).
+		WithValidator(r).
+		WithDefaulter(r, admission.DefaulterRemoveUnknownOrOmitableFields).
+		Complete()
+}
+
+// +kubebuilder:webhook:verbs=create;update,path=/validate-infrastructure-cluster-x-k8s-io-v1alpha2-microvmmachine,mutating=false,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=microvmmachine,versions=v1alpha2,name=validation.microvmmachine.v1alpha2.infrastructure.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1beta1
+// +kubebuilder:webhook:verbs=create;update,path=/mutate-infrastructure-cluster-x-k8s-io-v1alpha2-microvmmachine,mutating=true,failurePolicy=fail,matchPolicy=Equivalent,groups=infrastructure.cluster.x-k8s.io,resources=microvmmachine,versions=v1alpha2,name=default.microvmmachine.v1alpha2.infrastructure.cluster.x-k8s.io,sideEffects=None,admissionReviewVersions=v1beta1
+
+var (
+	_ webhook.CustomValidator = &MicrovmMachineV1alpha2{}
+	_ webhook.CustomDefaulter = &MicrovmMachineV1alpha2{}
+)
+
+func (r *MicrovmMachineV1alpha2) ValidateCreate(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+	return nil, nil
+}
+
+func (r *MicrovmMachineV1alpha2) ValidateDelete(_ context.Context, _ runtime.Object) (admission.Warnings, error) {
+	return nil, nil
+}
+
+func (r *MicrovmMachineV1alpha2) ValidateUpdate(_ context.Context, oldObj, newObj runtime.Object) (warnings admission.Warnings, err error) {
+	newMachine, ok := newObj.(*infrav1alpha2.MicrovmMachine)
+	if !ok {
+		return warnings, apierrors.NewBadRequest(fmt.Sprintf("expected a MicrovmMachine but got %T", newObj))
+	}
+	oldMachine, ok := oldObj.(*infrav1alpha2.MicrovmMachine)
+	if !ok {
+		return warnings, apierrors.NewBadRequest(fmt.Sprintf("expected a MicrovmMachine but got %T", oldObj))
+	}
+	if !reflect.DeepEqual(newMachine.Spec, oldMachine.Spec) {
+		return warnings, apierrors.NewBadRequest("microvm machine spec is immutable")
+	}
+	return warnings, nil
+}
+
+func (r *MicrovmMachineV1alpha2) Default(_ context.Context, obj runtime.Object) error {
+	machine, ok := obj.(*infrav1alpha2.MicrovmMachine)
+	if !ok {
+		return apierrors.NewBadRequest(fmt.Sprintf("expected a MicrovmMachine but got a %T", obj))
+	}
+	infrav1alpha2.SetObjectDefaults_MicrovmMachine(machine)
 	return nil
 }

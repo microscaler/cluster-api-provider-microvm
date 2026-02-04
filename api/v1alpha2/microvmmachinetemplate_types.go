@@ -13,7 +13,6 @@ type MicrovmMachineTemplateSpec struct {
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:storageversion
 // +kubebuilder:resource:path=microvmmachinetemplates,scope=Namespaced,categories=cluster-api,shortName=mvmmt
 // +k8s:defaulter-gen=true
 

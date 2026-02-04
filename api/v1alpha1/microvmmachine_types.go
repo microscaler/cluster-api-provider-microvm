@@ -89,6 +89,7 @@ type MicrovmMachineStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:storageversion
 //+k8s:defaulter-gen=true
 
 // MicrovmMachine is the Schema for the microvmmachines API.

@@ -10,7 +10,7 @@ package v1alpha2
 import (
 	"github.com/liquidmetal-dev/controller-pkg/client"
 	"github.com/liquidmetal-dev/controller-pkg/types/microvm"
-	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/errors"
 )

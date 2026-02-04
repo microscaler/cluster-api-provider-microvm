@@ -125,6 +125,10 @@ generate-go: $(CONTROLLER_GEN) $(DEFAULTER_GEN) $(COUNTERFEITER)
 		./api/v1alpha1 \
 		--v=0 $(GEN_FILE) \
 		--go-header-file=./hack/boilerplate.go.txt
+	$(DEFAULTER_GEN) \
+		./api/v1alpha2 \
+		--v=0 $(GEN_FILE) \
+		--go-header-file=./hack/boilerplate.go.txt
 
 	go generate ./...
 

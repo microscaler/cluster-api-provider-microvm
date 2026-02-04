@@ -48,6 +48,7 @@ import (
 
 	//+kubebuilder:scaffold:imports
 	infrav1 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha1"
+	infrav1alpha2 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha2"
 	"github.com/liquidmetal-dev/cluster-api-provider-microvm/controllers"
 	"github.com/liquidmetal-dev/cluster-api-provider-microvm/version"
 )
@@ -55,6 +56,7 @@ import (
 //nolint:gochecknoinits // Maybe we can remove it, now just ignore.
 func init() {
 	_ = infrav1.AddToScheme(scheme)
+	_ = infrav1alpha2.AddToScheme(scheme)
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = clusterv1.AddToScheme(scheme)
 	_ = expclusterv1.AddToScheme(scheme)
@@ -339,13 +341,22 @@ func setupWebhooks(mgr ctrl.Manager) error {
 	if err := (&webhookMicro.MicrovmCluster{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to setup MicrovmCluster webhook:%w", err)
 	}
+	if err := (&webhookMicro.MicrovmClusterV1alpha2{}).SetupWebhookWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to setup MicrovmCluster v1alpha2 webhook:%w", err)
+	}
 
 	if err := (&webhookMicro.MicrovmMachine{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to setup MicrovmMachine webhook:%w", err)
 	}
+	if err := (&webhookMicro.MicrovmMachineV1alpha2{}).SetupWebhookWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to setup MicrovmMachine v1alpha2 webhook:%w", err)
+	}
 
 	if err := (&webhookMicro.MicrovmMachineTemplate{}).SetupWebhookWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to setup MicrovmMachineTemplate webhook:%w", err)
+	}
+	if err := (&webhookMicro.MicrovmMachineTemplateV1alpha2{}).SetupWebhookWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to setup MicrovmMachineTemplate v1alpha2 webhook:%w", err)
 	}
 
 	return nil
