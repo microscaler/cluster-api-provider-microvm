@@ -7,7 +7,7 @@ import (
 	flclient "github.com/liquidmetal-dev/controller-pkg/client"
 	"github.com/liquidmetal-dev/controller-pkg/types/microvm"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // MicrovmClusterSpec defines the desired state of MicrovmCluster.
@@ -88,7 +88,8 @@ type MicrovmClusterStatus struct {
 
 	// FailureDomains is a list of the failure domains that CAPI should spread the machines across. For
 	// the CAPMVM provider this equates to host machines that can run microvms using Flintlock.
-	FailureDomains clusterv1.FailureDomains `json:"failureDomains,omitempty"`
+	// v1beta2 uses a slice of FailureDomain; v1beta1 used a map.
+	FailureDomains []clusterv1.FailureDomain `json:"failureDomains,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -35,8 +35,8 @@ import (
 	v1 "k8s.io/component-base/logs/api/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	expclusterv1 "sigs.k8s.io/cluster-api/exp/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/flags"
 	"sigs.k8s.io/cluster-api/util/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -59,7 +59,7 @@ func init() {
 	_ = infrav1alpha2.AddToScheme(scheme)
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = clusterv1.AddToScheme(scheme)
-	_ = expclusterv1.AddToScheme(scheme)
+	_ = clusterv1beta2.AddToScheme(scheme)
 	//+kubebuilder:scaffold:scheme
 
 	_ = "comment can't be at the end of the function"

@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/klog/v2/klogr"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -20,7 +20,7 @@ import (
 
 var _ Scoper = &ClusterScope{}
 
-func NewClusterScope(cluster *clusterv1.Cluster,
+func NewClusterScope(cluster *clusterv1beta2.Cluster,
 	microvmCluster *infrav1.MicrovmCluster,
 	client client.Client, opts ...ClusterScopeOption,
 ) (*ClusterScope, error) {
@@ -72,10 +72,11 @@ func WithClusterControllerName(name string) ClusterScopeOption {
 }
 
 // ClusterScope is the scope for reconciling a cluster.
+// CAPI Cluster is v1beta2 (as returned by util.GetOwnerCluster in CAPI v1.11).
 type ClusterScope struct {
 	logr.Logger
 
-	Cluster    *clusterv1.Cluster
+	Cluster    *clusterv1beta2.Cluster
 	MvmCluster *infrav1.MicrovmCluster
 
 	client         client.Client
@@ -105,22 +106,22 @@ func (cs *ClusterScope) ControllerName() string {
 
 // Patch persists the resource and status.
 func (cs *ClusterScope) Patch() error {
-	applicableConditions := []clusterv1.ConditionType{
-		infrav1.LoadBalancerAvailableCondition,
+	applicableConditions := []clusterv1beta2.ConditionType{
+		clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition),
 	}
 
-	conditions.SetSummary(cs.MvmCluster,
-		conditions.WithConditions(applicableConditions...),
-		conditions.WithStepCounterIf(cs.MvmCluster.DeletionTimestamp.IsZero()),
-		conditions.WithStepCounter(),
+	v1beta1conditions.SetSummary(cs.MvmCluster,
+		v1beta1conditions.WithConditions(applicableConditions...),
+		v1beta1conditions.WithStepCounterIf(cs.MvmCluster.DeletionTimestamp.IsZero()),
+		v1beta1conditions.WithStepCounter(),
 	)
 
 	err := cs.patchHelper.Patch(
 		context.TODO(),
 		cs.MvmCluster,
-		patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
-			clusterv1.ReadyCondition,
-			infrav1.LoadBalancerAvailableCondition,
+		patch.WithOwnedV1Beta1Conditions{Conditions: []clusterv1beta2.ConditionType{
+			clusterv1beta2.ReadyV1Beta1Condition,
+			clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition),
 		}})
 	if err != nil {
 		return fmt.Errorf("unable to patch cluster: %w", err)

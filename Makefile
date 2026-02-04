@@ -74,11 +74,32 @@ test: ## Run tests.
 
 TEST_ARTEFACTS := $(REPO_ROOT)/test/e2e/_artefacts
 E2E_ARGS ?= ""
+# E2E_CONFIG: e2e config file (relative to test/e2e). Use config/e2e_conf_v1beta2.yaml for CAPI v1beta2.
+E2E_CONFIG ?= config/e2e_conf.yaml
+
+# Fail early if e2e is run without flintlock host(s) (avoids cryptic test failure).
+.PHONY: e2e-check-flintlock
+e2e-check-flintlock:
+	@if [ -z "$(strip $(E2E_ARGS))" ]; then \
+		echo "Error: e2e requires at least one flintlock server address. Set E2E_ARGS, e.g.:"; \
+		echo "  make e2e E2E_ARGS=\"-e2e.flintlock-hosts \$$FL:9090\""; \
+		echo "  (Replace \$$FL with your flintlock host, e.g. \$$(hostname -I | awk '{print \$$1}')"; \
+		exit 1; \
+	fi
 
 .PHONY: e2e
+e2e: e2e-check-flintlock
 e2e: TAG=e2e
-e2e: $(GINKGO) docker-build ## Run end to end test suite.
-	$(GINKGO) -tags=e2e -v -r test/e2e -- -e2e.artefact-dir $(TEST_ARTEFACTS) $(E2E_ARGS)
+e2e: $(GINKGO) docker-build ## Run end to end test suite (default: CAPI v1beta1 config).
+	$(GINKGO) -tags=e2e -v -r test/e2e -- -e2e.artefact-dir $(TEST_ARTEFACTS) -e2e.config=$(E2E_CONFIG) $(E2E_ARGS)
+
+.PHONY: e2e-v1beta1
+e2e-v1beta1: E2E_CONFIG=config/e2e_conf.yaml
+e2e-v1beta1: e2e ## Run e2e with CAPI v1beta1 contract (v1.1.x).
+
+.PHONY: e2e-v1beta2
+e2e-v1beta2: E2E_CONFIG=config/e2e_conf_v1beta2.yaml
+e2e-v1beta2: e2e ## Run e2e with CAPI v1beta2 contract (v1.11.x).
 
 ##@ Binaries
 

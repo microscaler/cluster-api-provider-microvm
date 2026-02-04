@@ -17,9 +17,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2/klogr"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 	"sigs.k8s.io/cluster-api/util"
-	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,10 +38,10 @@ const (
 )
 
 type MachineScopeParams struct {
-	Cluster        *clusterv1.Cluster
+	Cluster        *clusterv1beta2.Cluster
 	MicroVMCluster *infrav1.MicrovmCluster
 
-	Machine        *clusterv1.Machine
+	Machine        *clusterv1beta2.Machine
 	MicroVMMachine *infrav1.MicrovmMachine
 
 	Client  client.Client
@@ -110,10 +110,10 @@ func WithMachineControllerName(name string) MachineScopeOption {
 type MachineScope struct {
 	logr.Logger
 
-	Cluster    *clusterv1.Cluster
+	Cluster    *clusterv1beta2.Cluster
 	MvmCluster *infrav1.MicrovmCluster
 
-	Machine    *clusterv1.Machine
+	Machine    *clusterv1beta2.Machine
 	MvmMachine *infrav1.MicrovmMachine
 
 	client         client.Client
@@ -149,22 +149,23 @@ func (m *MachineScope) IsControlPlane() bool {
 
 // Patch persists the resource and status.
 func (m *MachineScope) Patch() error {
-	applicableConditions := []clusterv1.ConditionType{
-		infrav1.MicrovmReadyCondition,
+	// Deprecated v1beta1conditions package expects v1beta2.ConditionType.
+	applicableConditions := []clusterv1beta2.ConditionType{
+		clusterv1beta2.ConditionType(infrav1.MicrovmReadyCondition),
 	}
 
-	conditions.SetSummary(m.MvmMachine,
-		conditions.WithConditions(applicableConditions...),
-		conditions.WithStepCounterIf(m.MvmMachine.DeletionTimestamp.IsZero()),
-		conditions.WithStepCounter(),
+	v1beta1conditions.SetSummary(m.MvmMachine,
+		v1beta1conditions.WithConditions(applicableConditions...),
+		v1beta1conditions.WithStepCounterIf(m.MvmMachine.DeletionTimestamp.IsZero()),
+		v1beta1conditions.WithStepCounter(),
 	)
 
 	err := m.patchHelper.Patch(
 		m.ctx,
 		m.MvmMachine,
-		patch.WithOwnedConditions{Conditions: []clusterv1.ConditionType{
-			clusterv1.ReadyCondition,
-			infrav1.MicrovmReadyCondition,
+		patch.WithOwnedV1Beta1Conditions{Conditions: []clusterv1beta2.ConditionType{
+			clusterv1beta2.ReadyV1Beta1Condition,
+			clusterv1beta2.ConditionType(infrav1.MicrovmReadyCondition),
 		}})
 	if err != nil {
 		return fmt.Errorf("unable to patch machine: %w", err)
@@ -192,8 +193,8 @@ func (m *MachineScope) GetLabels() map[string]string {
 }
 
 func (m *MachineScope) GetFailureDomain() (string, error) {
-	if m.Machine.Spec.FailureDomain != nil && *m.Machine.Spec.FailureDomain != "" {
-		return *m.Machine.Spec.FailureDomain, nil
+	if m.Machine.Spec.FailureDomain != "" {
+		return m.Machine.Spec.FailureDomain, nil
 	}
 
 	providerID := m.GetProviderID()
@@ -203,9 +204,10 @@ func (m *MachineScope) GetFailureDomain() (string, error) {
 
 	// If we've got this far then we need to work out how to get a failure domain. In the future we will make
 	// the strategy configurable for static placement and also add support for the scheduler.
+	// v1beta2 Cluster.Status.FailureDomains is []FailureDomain (each has Name).
 	failureDomainNames := make([]string, 0, len(m.Cluster.Status.FailureDomains))
-	for fdName := range m.Cluster.Status.FailureDomains {
-		failureDomainNames = append(failureDomainNames, fdName)
+	for i := range m.Cluster.Status.FailureDomains {
+		failureDomainNames = append(failureDomainNames, m.Cluster.Status.FailureDomains[i].Name)
 	}
 
 	if len(failureDomainNames) == 0 {
@@ -252,7 +254,7 @@ func (m *MachineScope) GetRawBootstrapData() (string, error) {
 // SetReady sets any properties/conditions that are used to indicate that the MicrovmMachine is 'Ready'
 // back to the upstream CAPI machine controllers.
 func (m *MachineScope) SetReady() {
-	conditions.MarkTrue(m.MvmMachine, infrav1.MicrovmReadyCondition)
+	v1beta1conditions.MarkTrue(m.MvmMachine, clusterv1beta2.ConditionType(infrav1.MicrovmReadyCondition))
 	m.MvmMachine.Status.Ready = true
 }
 
@@ -260,11 +262,11 @@ func (m *MachineScope) SetReady() {
 // back to the upstream CAPI machine controllers.
 func (m *MachineScope) SetNotReady(
 	reason string,
-	severity clusterv1.ConditionSeverity,
+	severity clusterv1beta2.ConditionSeverity,
 	message string,
 	messageArgs ...interface{},
 ) {
-	conditions.MarkFalse(m.MvmMachine, infrav1.MicrovmReadyCondition, reason, severity, message, messageArgs...)
+	v1beta1conditions.MarkFalse(m.MvmMachine, clusterv1beta2.ConditionType(infrav1.MicrovmReadyCondition), reason, severity, message, messageArgs...)
 	m.MvmMachine.Status.Ready = false
 }
 

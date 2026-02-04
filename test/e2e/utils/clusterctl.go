@@ -11,11 +11,9 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/test/framework/clusterctl"
 	"sigs.k8s.io/cluster-api/util/yaml"
-
-	"github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha1"
 )
 
 // ApplyClusterInput tidies up the input params for ApplyClusterTemplateAndWait
@@ -44,7 +42,7 @@ func ApplyClusterTemplateAndWait(ctx context.Context, params ApplyClusterInput) 
 	Expect(input.ConfigCluster.WorkerMachineCount).ToNot(BeNil())
 
 	// Ensure we have a Cluster for dump and cleanup steps in AfterEach even if ApplyClusterTemplateAndWait fails.
-	result.Cluster = &clusterv1.Cluster{
+	result.Cluster = &clusterv1beta2.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      input.ConfigCluster.ClusterName,
 			Namespace: input.ConfigCluster.Namespace,
@@ -127,26 +125,28 @@ func addFlintlockHostsToTemplate(flintlockAddresses []string, ymlBytes []byte) [
 
 	Expect(clusterBytes).NotTo(HaveLen(0), "MicrovmCluster object not found in generated template")
 
-	// We can then Unmarshal those bytes into a MicrovmCluster object. Going
-	// backwards and forwards like this is easier than trying to do what we need
-	// with a map[string]interface.
-	mvmCluster := v1alpha1.MicrovmCluster{}
-	Expect(json.Unmarshal(clusterBytes, &mvmCluster)).To(Succeed())
+	// Use unstructured so we support both v1alpha1 and v1alpha2 MicrovmCluster
+	// without duplicating logic. Placement.staticPool.hosts has the same shape in both.
+	obj := make(map[string]interface{})
+	Expect(json.Unmarshal(clusterBytes, &obj)).To(Succeed())
 
-	// Now we have an easy object to add flintlock host addresses to.
-	hosts := []v1alpha1.MicrovmHost{}
+	spec, _ := obj["spec"].(map[string]interface{})
+	Expect(spec).NotTo(BeNil(), "MicrovmCluster spec not found")
+	placement, _ := spec["placement"].(map[string]interface{})
+	Expect(placement).NotTo(BeNil(), "MicrovmCluster spec.placement not found")
+	staticPool, _ := placement["staticPool"].(map[string]interface{})
+	Expect(staticPool).NotTo(BeNil(), "MicrovmCluster spec.placement.staticPool not found")
+
+	hosts := make([]interface{}, 0, len(flintlockAddresses))
 	for _, addr := range flintlockAddresses {
-		hosts = append(hosts, v1alpha1.MicrovmHost{
-			Endpoint:            addr,
-			ControlPlaneAllowed: true,
+		hosts = append(hosts, map[string]interface{}{
+			"endpoint":             addr,
+			"controlplaneAllowed": true,
 		})
 	}
+	staticPool["hosts"] = hosts
 
-	mvmCluster.Spec.Placement.StaticPool.Hosts = hosts
-
-	// Now we go back the other way: we Marshal the edited MicrovmCluster back
-	// into bytes.
-	editedClusterBytes, err := json.Marshal(mvmCluster)
+	editedClusterBytes, err := json.Marshal(obj)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Then we Unmarshal to a new Unstructured object.

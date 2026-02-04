@@ -4,7 +4,7 @@
 package v1alpha2
 
 import (
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // MicrovmMachineTemplateResource describes the data needed to create a MicrovmMachine from a template.

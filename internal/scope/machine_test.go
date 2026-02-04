@@ -12,7 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -161,9 +161,9 @@ func TestMachineGetBasicAuthToken(t *testing.T) {
 			client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tc.initObjects...).Build()
 			machineScope, err := scope.NewMachineScope(scope.MachineScopeParams{
 				Client:         client,
-				Cluster:        &clusterv1.Cluster{},
+				Cluster:        &clusterv1beta2.Cluster{},
 				MicroVMCluster: tc.cluster,
-				Machine:        &clusterv1.Machine{},
+				Machine:        &clusterv1beta2.Machine{},
 				MicroVMMachine: &infrav1.MicrovmMachine{},
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -260,9 +260,9 @@ func TestMachineGetTLSConfig(t *testing.T) {
 			client := fake.NewClientBuilder().WithScheme(scheme).WithObjects(tc.initObjects...).Build()
 			machineScope, err := scope.NewMachineScope(scope.MachineScopeParams{
 				Client:         client,
-				Cluster:        &clusterv1.Cluster{},
+				Cluster:        &clusterv1beta2.Cluster{},
 				MicroVMCluster: tc.cluster,
-				Machine:        &clusterv1.Machine{},
+				Machine:        &clusterv1beta2.Machine{},
 				MicroVMMachine: &infrav1.MicrovmMachine{},
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -332,7 +332,7 @@ func TestMachineFailureDomainFromMachine(t *testing.T) {
 
 	machineName := "machine-1"
 	machine := newMachine(clusterName, machineName)
-	machine.Spec.FailureDomain = pointer.String("fd2")
+	machine.Spec.FailureDomain = "fd2"
 	mvmMachine := newMicrovmMachine(clusterName, machineName, "")
 
 	initObjects := []client.Object{
@@ -392,7 +392,7 @@ func setupScheme() (*runtime.Scheme, error) {
 	if err := infrav1.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
-	if err := clusterv1.AddToScheme(scheme); err != nil {
+	if err := clusterv1beta2.AddToScheme(scheme); err != nil {
 		return nil, err
 	}
 	if err := corev1.AddToScheme(scheme); err != nil {
@@ -401,26 +401,26 @@ func setupScheme() (*runtime.Scheme, error) {
 	return scheme, nil
 }
 
-func newMachine(clusterName, machineName string) *clusterv1.Machine {
-	return &clusterv1.Machine{
+func newMachine(clusterName, machineName string) *clusterv1beta2.Machine {
+	return &clusterv1beta2.Machine{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				clusterv1.ClusterNameLabel: clusterName,
+				clusterv1beta2.ClusterNameLabel: clusterName,
 			},
 			Name:      machineName,
 			Namespace: "default",
 		},
-		Spec: clusterv1.MachineSpec{
+		Spec: clusterv1beta2.MachineSpec{
 			ClusterName: clusterName,
-			Bootstrap: clusterv1.Bootstrap{
-				DataSecretName: pointer.StringPtr(machineName),
+			Bootstrap: clusterv1beta2.Bootstrap{
+				DataSecretName: pointer.String(machineName),
 			},
 		},
 	}
 }
 
-func newCluster(name string, failureDomains []string) *clusterv1.Cluster {
-	cluster := &clusterv1.Cluster{
+func newCluster(name string, failureDomains []string) *clusterv1beta2.Cluster {
+	cluster := &clusterv1beta2.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "default",
@@ -428,15 +428,13 @@ func newCluster(name string, failureDomains []string) *clusterv1.Cluster {
 	}
 
 	if len(failureDomains) > 0 {
-		cluster.Status = clusterv1.ClusterStatus{
-			FailureDomains: make(clusterv1.FailureDomains),
-		}
-
-		for i := range failureDomains {
-			fd := failureDomains[i]
-			cluster.Status.FailureDomains[fd] = clusterv1.FailureDomainSpec{
-				ControlPlane: true,
-			}
+		cluster.Status.FailureDomains = make([]clusterv1beta2.FailureDomain, 0, len(failureDomains))
+		for _, fd := range failureDomains {
+			cp := true
+			cluster.Status.FailureDomains = append(cluster.Status.FailureDomains, clusterv1beta2.FailureDomain{
+				Name:         fd,
+				ControlPlane: &cp,
+			})
 		}
 	}
 
@@ -456,7 +454,7 @@ func newMicrovmMachine(clusterName, machineName string, providerID string) *infr
 	mvmMachine := &infrav1.MicrovmMachine{
 		ObjectMeta: metav1.ObjectMeta{
 			Labels: map[string]string{
-				clusterv1.ClusterNameLabel: clusterName,
+				clusterv1beta2.ClusterNameLabel: clusterName,
 			},
 			Name:      machineName,
 			Namespace: "default",

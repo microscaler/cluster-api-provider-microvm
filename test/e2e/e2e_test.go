@@ -46,8 +46,8 @@ var _ = Describe("CAPMVM", func() {
 		}
 	})
 
-	It("should create cluster with single control plane node and 5 worker nodes", func() {
-		specName := "simple-cluster"
+	It("should create cluster (v1alpha1 API) with single control plane node and 5 worker nodes", func() {
+		specName := "simple-cluster-v1alpha1"
 
 		namespace, cancelWatches = framework.CreateNamespaceAndWatchEvents(ctx, framework.CreateNamespaceAndWatchEventsInput{
 			Creator:   mngr.ClusterProxy.GetClient(),
@@ -56,7 +56,7 @@ var _ = Describe("CAPMVM", func() {
 			LogFolder: filepath.Join(mngr.ArtefactDir, "logs", "clusters", mngr.ClusterProxy.GetName()),
 		})
 
-		By("Creating microvm cluster")
+		By("Creating microvm cluster (v1alpha1)")
 		clusterName := fmt.Sprintf("%s-%s", specName, util.RandomString(6))
 
 		utils.SetEnvVar("CONTROL_PLANE_VIP", mngr.VIPAddress, false)
@@ -75,6 +75,73 @@ var _ = Describe("CAPMVM", func() {
 					KubeconfigPath:           mngr.KubeconfigPath,
 					InfrastructureProvider:   "microvm:v0.6.99", // TODO: unhardcode this
 					Flavor:                   utils.Cilium,
+					Namespace:                namespace.Name,
+					ClusterName:              clusterName,
+					KubernetesVersion:        fmt.Sprintf("v%s", mngr.KubernetesVersion),
+					ControlPlaneMachineCount: pointer.Int64Ptr(1),
+					WorkerMachineCount:       pointer.Int64Ptr(5),
+				},
+				WaitForClusterIntervals:      mngr.Cfg.GetIntervals(specName, "wait-cluster"),
+				WaitForControlPlaneIntervals: mngr.Cfg.GetIntervals(specName, "wait-control-plane"),
+				WaitForMachineDeployments:    mngr.Cfg.GetIntervals(specName, "wait-worker-nodes"),
+			},
+			Result: result,
+		}
+
+		utils.ApplyClusterTemplateAndWait(ctx, input)
+
+		By("Checking that microvms are allocated across all given flintlock hosts")
+		Expect(utils.FailureDomainSpread(mngr.ClusterProxy, namespace.Name, clusterName)).To(Equal(len(mngr.FlintlockHosts)),
+			"Nodes were not distributed across all flintlock hosts.")
+
+		By("Checking that an application can be deployed to the workload cluster")
+		var depReplicas int32 = 2
+		depName := "nginx-deployment"
+		depNamespace := "default"
+
+		nginx := utils.Nginx(depName, depNamespace, depReplicas)
+		workloadClient := mngr.ClusterProxy.GetWorkloadCluster(ctx, namespace.Name, clusterName).GetClient()
+		Expect(workloadClient.Create(ctx, nginx)).To(Succeed())
+
+		Eventually(func() bool {
+			created := &appsv1.Deployment{}
+			err := workloadClient.Get(ctx, client.ObjectKey{Namespace: depNamespace, Name: depName}, created)
+			Expect(err).NotTo(HaveOccurred())
+			return created.Status.ReadyReplicas == depReplicas
+		}, mngr.Cfg.GetIntervals("default", "wait-workload-task")...).Should(BeTrue())
+
+		By("PASSED!")
+	})
+
+	It("should create cluster (v1alpha2 API) with single control plane node and 5 worker nodes", func() {
+		specName := "simple-cluster-v1alpha2"
+
+		namespace, cancelWatches = framework.CreateNamespaceAndWatchEvents(ctx, framework.CreateNamespaceAndWatchEventsInput{
+			Creator:   mngr.ClusterProxy.GetClient(),
+			ClientSet: mngr.ClusterProxy.GetClientSet(),
+			Name:      fmt.Sprintf("%s-%s", specName, util.RandomString(6)),
+			LogFolder: filepath.Join(mngr.ArtefactDir, "logs", "clusters", mngr.ClusterProxy.GetName()),
+		})
+
+		By("Creating microvm cluster (v1alpha2)")
+		clusterName := fmt.Sprintf("%s-%s", specName, util.RandomString(6))
+
+		utils.SetEnvVar("CONTROL_PLANE_VIP", mngr.VIPAddress, false)
+		utils.SetEnvVar("KUBERNETES_VERSION", fmt.Sprintf("v%s", mngr.KubernetesVersion), false)
+		utils.SetEnvVar("MVM_ROOT_IMAGE", fmt.Sprintf("%s:%s", "ghcr.io/liquidmetal-dev/capmvm-kubernetes", mngr.KubernetesVersion), false)
+
+		result := &clusterctl.ApplyClusterTemplateAndWaitResult{}
+
+		input := utils.ApplyClusterInput{
+			Hosts: mngr.FlintlockHosts,
+			Input: clusterctl.ApplyClusterTemplateAndWaitInput{
+				ClusterProxy: mngr.ClusterProxy,
+				ConfigCluster: clusterctl.ConfigClusterInput{
+					LogFolder:                filepath.Join(mngr.ArtefactDir, "logs", "clusters", mngr.ClusterProxy.GetName()),
+					ClusterctlConfigPath:     mngr.ClusterctlCfg,
+					KubeconfigPath:           mngr.KubeconfigPath,
+					InfrastructureProvider:   "microvm:v0.6.99", // TODO: unhardcode this
+					Flavor:                   utils.V1Alpha2Cilium,
 					Namespace:                namespace.Name,
 					ClusterName:              clusterName,
 					KubernetesVersion:        fmt.Sprintf("v%s", mngr.KubernetesVersion),

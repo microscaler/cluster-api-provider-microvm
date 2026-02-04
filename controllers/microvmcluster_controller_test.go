@@ -15,8 +15,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
+	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	v1beta1conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 
 	infrav1 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha1"
 )
@@ -40,7 +41,7 @@ func TestClusterReconciliationNoEndpoint(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(reconciled.Status.Ready).To(BeFalse())
 
-	c := conditions.Get(reconciled, infrav1.LoadBalancerAvailableCondition)
+	c := v1beta1conditions.Get(reconciled, clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition))
 	g.Expect(c).To(BeNil())
 }
 
@@ -48,7 +49,7 @@ func TestClusterReconciliationWithClusterEndpoint(t *testing.T) {
 	g := NewWithT(t)
 
 	cluster := createCluster()
-	cluster.Spec.ControlPlaneEndpoint = clusterv1.APIEndpoint{
+	cluster.Spec.ControlPlaneEndpoint = clusterv1beta2.APIEndpoint{
 		Host: "192.168.8.15",
 		Port: 6443,
 	}
@@ -82,7 +83,7 @@ func TestClusterReconciliationWithClusterEndpoint(t *testing.T) {
 	// g.Expect(reconciled.Status.Ready).To(BeTrue())
 	// g.Expect(reconciled.Status.FailureDomains).To(HaveLen(1))
 
-	// c := conditions.Get(reconciled, infrav1.LoadBalancerAvailableCondition)
+	// c := v1beta1conditions.Get(reconciled, clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition))
 	// g.Expect(c).ToNot(BeNil())
 	// g.Expect(c.Status).To(Equal(corev1.ConditionTrue))
 
@@ -129,7 +130,7 @@ func TestClusterReconciliationWithMvmClusterEndpoint(t *testing.T) {
 	// g.Expect(reconciled.Status.Ready).To(BeTrue())
 	// g.Expect(reconciled.Status.FailureDomains).To(HaveLen(1))
 
-	// c := conditions.Get(reconciled, infrav1.LoadBalancerAvailableCondition)
+	// c := v1beta1conditions.Get(reconciled, clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition))
 	// g.Expect(c).ToNot(BeNil())
 	// g.Expect(c.Status).To(Equal(corev1.ConditionTrue))
 
@@ -142,7 +143,7 @@ func TestClusterReconciliationWithClusterEndpointAPIServerNotReady(t *testing.T)
 	g := NewWithT(t)
 
 	cluster := createCluster()
-	cluster.Spec.ControlPlaneEndpoint = clusterv1.APIEndpoint{
+	cluster.Spec.ControlPlaneEndpoint = clusterv1beta2.APIEndpoint{
 		Host: "192.168.8.15",
 		Port: 6443,
 	}
@@ -170,7 +171,7 @@ func TestClusterReconciliationWithClusterEndpointAPIServerNotReady(t *testing.T)
 	// g.Expect(reconciled.Status.Ready).To(BeTrue())
 	// g.Expect(reconciled.Status.FailureDomains).To(HaveLen(1))
 
-	// c := conditions.Get(reconciled, infrav1.LoadBalancerAvailableCondition)
+	// c := v1beta1conditions.Get(reconciled, clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition))
 	// g.Expect(c).ToNot(BeNil())
 	// g.Expect(c.Status).To(Equal(corev1.ConditionFalse))
 
@@ -217,7 +218,7 @@ func TestClusterReconciliationNotOwner(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(reconciled.Status.Ready).To(BeFalse())
 
-	c := conditions.Get(reconciled, infrav1.LoadBalancerAvailableCondition)
+	c := v1beta1conditions.Get(reconciled, clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition))
 	g.Expect(c).To(BeNil())
 }
 
@@ -226,7 +227,7 @@ func TestClusterReconciliationWhenPaused(t *testing.T) {
 
 	mvmCluster := createMicrovmCluster()
 	mvmCluster.ObjectMeta.Annotations = map[string]string{
-		clusterv1.PausedAnnotation: "true",
+		clusterv1beta2.PausedAnnotation: "true",
 	}
 
 	objects := []runtime.Object{
@@ -245,7 +246,7 @@ func TestClusterReconciliationWhenPaused(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 	g.Expect(reconciled.Status.Ready).To(BeFalse())
 
-	c := conditions.Get(reconciled, infrav1.LoadBalancerAvailableCondition)
+	c := v1beta1conditions.Get(reconciled, clusterv1beta2.ConditionType(infrav1.LoadBalancerAvailableCondition))
 	g.Expect(c).To(BeNil())
 }
 

@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/cluster-api/test/framework"
 
 	infrav1 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha1"
+	infrav1alpha2 "github.com/liquidmetal-dev/cluster-api-provider-microvm/api/v1alpha2"
 )
 
 const (
@@ -28,10 +29,12 @@ const (
 	DefaultExistingCluster = false
 )
 
-// Flavour consts.
+// Flavour consts for clusterctl template selection.
 const (
-	Vanilla = ""
-	Cilium  = "cilium"
+	Vanilla       = ""
+	Cilium        = "cilium"
+	V1Alpha2      = "v1alpha2"
+	V1Alpha2Cilium = "v1alpha2-cilium"
 )
 
 // DefaultScheme returns the default scheme to use for testing.
@@ -39,6 +42,7 @@ func DefaultScheme() *runtime.Scheme {
 	sc := runtime.NewScheme()
 	framework.TryAddDefaultSchemes(sc)
 	_ = infrav1.AddToScheme(sc)
+	_ = infrav1alpha2.AddToScheme(sc)
 	_ = cgscheme.AddToScheme(sc)
 
 	return sc

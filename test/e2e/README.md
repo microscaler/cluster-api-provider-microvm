@@ -92,6 +92,7 @@ Usage of /home/claudia/workspace/cluster-api-provider-microvm/test/e2e/e2e.test:
         Address for the kubevip load balancer. (default "192.168.1.25")
   -e2e.config string
         Path to e2e config for this suite. (default "config/e2e_conf.yaml")
+        Use config/e2e_conf_v1beta2.yaml to run against CAPI v1beta2 contract (v1.11.x).
   -e2e.existing-cluster
         If true, uses the current context for the management cluster and will not create a new one.
   -e2e.flintlock-hosts value
@@ -108,6 +109,29 @@ make e2e E2E_ARGS="-e2e.skip-cleanup"
 
 To use the `e2e.existing-cluster` boolean flag, you will need to ensure that the
 cluster is set as the current context.
+
+### CAPI contract version (v1beta1 vs v1beta2)
+
+Two e2e configs are available so you can test against either CAPI contract. The top-level Makefile supports both:
+
+| Make target | Config | CAPI version | Contract |
+|-------------|--------|-------------|----------|
+| `make e2e` or `make e2e-v1beta1` | `config/e2e_conf.yaml` | v1.1.5 | v1beta1 |
+| `make e2e-v1beta2` | `config/e2e_conf_v1beta2.yaml` | v1.11.1 | v1beta2 |
+
+Examples:
+
+```bash
+# v1beta1 (default)
+make e2e E2E_ARGS="-e2e.flintlock-hosts $FL:9090"
+# or explicitly
+make e2e-v1beta1 E2E_ARGS="-e2e.flintlock-hosts $FL:9090"
+
+# v1beta2 (matches go.mod CAPI v1.11.1)
+make e2e-v1beta2 E2E_ARGS="-e2e.flintlock-hosts $FL:9090"
+```
+
+To override the config via the flag instead: `make e2e E2E_ARGS="-e2e.config=config/e2e_conf_v1beta2.yaml -e2e.flintlock-hosts $FL:9090"`.
 
 _Note: `-e2e.flintlock-hosts` and `-e2e.artefact-dir` are already passed to the
 tests as part of the `make` command._
