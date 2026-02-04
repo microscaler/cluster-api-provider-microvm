@@ -9,13 +9,14 @@ import (
 )
 
 type Params struct {
-	E2EConfigPath      string
-	FlintlockHosts     stringSlice
-	ArtefactDir        string
-	KubernetesVersion  string
-	VIPAddress         string
-	UseExistingCluster bool
-	SkipCleanup        bool
+	E2EConfigPath   string
+	FlintlockHosts  stringSlice
+	UseFlintlockMock bool
+	ArtefactDir     string
+	KubernetesVersion      string
+	VIPAddress             string
+	UseExistingCluster     bool
+	SkipCleanup            bool
 }
 
 func NewParams() *Params {
@@ -25,6 +26,8 @@ func NewParams() *Params {
 		"Path to e2e config for this suite.")
 	flag.Var(&params.FlintlockHosts, "e2e.flintlock-hosts",
 		"Comma separated list of addresses to flintlock servers. eg '1.2.3.4:9090,5.6.7.8:9090'")
+	flag.BoolVar(&params.UseFlintlockMock, "e2e.use-flintlock-mock", false,
+		"If true, run an in-process mock of the flintlock gRPC API for e2e (no -e2e.flintlock-hosts needed).")
 	flag.StringVar(&params.ArtefactDir, "e2e.artefact-dir", DefaultArtefactDir(),
 		"Location to store test yamls, logs, etc.")
 	flag.StringVar(&params.KubernetesVersion, "e2e.capmvm.kubernetes-version", DefaultKubernetesVersion,

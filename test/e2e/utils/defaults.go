@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	// DefaultE2EConfig is the default loction for the E2E config file.
-	DefaultE2EConfig = "config/e2e_conf.yaml"
+	// DefaultE2EConfig is the default location for the E2E config file.
+	// Must use v1beta2 to match CAPI test framework (clusterctl v1.11.x only supports v1beta2 management clusters).
+	DefaultE2EConfig = "config/e2e_conf_v1beta2.yaml"
 	// DefaultKubernetesVersion is the default version of Kubernetes which will
 	// the workload cluster will run.
 	DefaultKubernetesVersion = "1.21.8"

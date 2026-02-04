@@ -69,8 +69,10 @@ providers:
           - sourcePath: "../data/v1beta1_provider/metadata.yaml"
           - sourcePath: "../data/infrastructure-microvm/v1alpha1/cluster-template.yaml"
           - sourcePath: "../data/infrastructure-microvm/v1alpha1/cluster-template-cilium.yaml"
-          - sourcePath: "../data/infrastructure-microvm/v1alpha2/cluster-template-v1alpha2.yaml"
-          - sourcePath: "../data/infrastructure-microvm/v1alpha2/cluster-template-v1alpha2-cilium.yaml"
+          - sourcePath: "../data/infrastructure-microvm/v1alpha2/cluster-template.yaml"
+            targetName: cluster-template-v1alpha2.yaml
+          - sourcePath: "../data/infrastructure-microvm/v1alpha2/cluster-template-cilium.yaml"
+            targetName: cluster-template-v1alpha2-cilium.yaml
         replacements:
           - old: "failureThreshold: 3"
             new: "failureThreshold: 12"
