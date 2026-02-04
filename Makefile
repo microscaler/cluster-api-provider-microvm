@@ -72,6 +72,11 @@ lint: $(GOLANGCI_LINT) ## Lint
 test: ## Run tests.
 	go test -v ./controllers/... ./internal/...
 
+.PHONY: coverage
+coverage: ## Run unit tests with coverage; report per-function and total (see docs/TEST_COVERAGE_AUDIT.md).
+	go test -coverprofile=coverage.out ./api/... ./controllers/... ./internal/... ./version/...
+	@go tool cover -func=coverage.out
+
 # E2E artefacts (cluster-template dumps, logs, clusterctl repo) go under ~/flintlock to avoid cluttering the repo.
 TEST_ARTEFACTS := $(HOME)/flintlock/_artefacts
 E2E_ARGS ?= ""
