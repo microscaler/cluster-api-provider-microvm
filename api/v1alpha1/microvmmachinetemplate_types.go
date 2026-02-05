@@ -13,6 +13,7 @@ type MicrovmMachineTemplateSpec struct {
 	Template MicrovmMachineTemplateResource `json:"template"`
 }
 
+// +kubebuilder:deprecatedversion:warning="v1alpha1 is deprecated; migrate to v1alpha2. Removal planned August 2026 (aligned with CAPI v1beta1 removal)."
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:resource:path=microvmmachinetemplates,scope=Namespaced,categories=cluster-api,shortName=mvmmt

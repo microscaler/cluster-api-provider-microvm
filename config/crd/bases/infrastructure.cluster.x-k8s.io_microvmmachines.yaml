@@ -14,7 +14,10 @@ spec:
     singular: microvmmachine
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - deprecated: true
+    deprecationWarning: v1alpha1 is deprecated; migrate to v1alpha2. Removal planned
+      August 2026 (aligned with CAPI v1beta1 removal).
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: MicrovmMachine is the Schema for the microvmmachines API.
@@ -252,7 +255,8 @@ spec:
                   type: object
                 type: array
               conditions:
-                description: Conditions defines current service state of the MicrovmMachine.
+                description: Conditions defines current service state of the MicrovmMachine
+                  (v1beta2 type for CAPI patch helper compatibility).
                 items:
                   description: Condition defines an observation of a Cluster API resource
                     operational state.

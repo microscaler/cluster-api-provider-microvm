@@ -94,6 +94,7 @@ type MicrovmClusterStatus struct {
 	FailureDomains clusterv1.FailureDomains `json:"failureDomains,omitempty"`
 }
 
+// +kubebuilder:deprecatedversion:warning="v1alpha1 is deprecated; migrate to v1alpha2. Removal planned August 2026 (aligned with CAPI v1beta1 removal)."
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion

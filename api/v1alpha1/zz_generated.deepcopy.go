@@ -11,8 +11,8 @@ import (
 	"github.com/liquidmetal-dev/controller-pkg/client"
 	"github.com/liquidmetal-dev/controller-pkg/types/microvm"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	clusterv1beta1 "sigs.k8s.io/cluster-api/api/core/v1beta1"
-	clusterv1beta2 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/cluster-api/api/core/v1beta1"
+	"sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/errors"
 )
 
@@ -109,14 +109,14 @@ func (in *MicrovmClusterStatus) DeepCopyInto(out *MicrovmClusterStatus) {
 	*out = *in
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make(clusterv1beta2.Conditions, len(*in))
+		*out = make(v1beta2.Conditions, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
 	if in.FailureDomains != nil {
 		in, out := &in.FailureDomains, &out.FailureDomains
-		*out = make(clusterv1beta1.FailureDomains, len(*in))
+		*out = make(v1beta1.FailureDomains, len(*in))
 		for key, val := range *in {
 			(*out)[key] = *val.DeepCopy()
 		}
@@ -245,7 +245,7 @@ func (in *MicrovmMachineStatus) DeepCopyInto(out *MicrovmMachineStatus) {
 	}
 	if in.Addresses != nil {
 		in, out := &in.Addresses, &out.Addresses
-		*out = make([]clusterv1beta1.MachineAddress, len(*in))
+		*out = make([]v1beta1.MachineAddress, len(*in))
 		copy(*out, *in)
 	}
 	if in.FailureReason != nil {
@@ -260,7 +260,7 @@ func (in *MicrovmMachineStatus) DeepCopyInto(out *MicrovmMachineStatus) {
 	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make(clusterv1beta2.Conditions, len(*in))
+		*out = make(v1beta2.Conditions, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

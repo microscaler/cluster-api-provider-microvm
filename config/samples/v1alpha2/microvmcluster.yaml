@@ -1,0 +1,21 @@
+# MicrovmCluster (v1alpha2) - complete sample for use with CAPI Cluster.
+# Reference this from Cluster.spec.infrastructureRef.
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha2
+kind: MicrovmCluster
+metadata:
+  name: microvmcluster-sample
+  # When used by a cluster, add: labels: cluster.x-k8s.io/cluster-name: "<cluster-name>"
+spec:
+  controlPlaneEndpoint:
+    host: 192.168.1.100
+    port: 6443
+  placement:
+    staticPool:
+      hosts:
+        - endpoint: "127.0.0.1:9090"
+          name: local-flintlock
+          controlplaneAllowed: true
+      # basicAuthSecret: my-basic-auth-secret
+  # sshPublicKeys: []
+  # tlsSecretRef: ""
+  # microvmProxy: {}

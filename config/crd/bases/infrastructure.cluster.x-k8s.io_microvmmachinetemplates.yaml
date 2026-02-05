@@ -18,7 +18,10 @@ spec:
     singular: microvmmachinetemplate
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - deprecated: true
+    deprecationWarning: v1alpha1 is deprecated; migrate to v1alpha2. Removal planned
+      August 2026 (aligned with CAPI v1beta1 removal).
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: MicrovmMachineTemplate is the Schema for the microvmmachinetemplates
@@ -306,6 +309,7 @@ spec:
                     description: |-
                       Standard object's metadata.
                       More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
+                    minProperties: 1
                     properties:
                       annotations:
                         additionalProperties:

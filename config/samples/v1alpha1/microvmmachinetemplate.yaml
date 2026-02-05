@@ -1,0 +1,29 @@
+# MicrovmMachineTemplate (v1alpha1) - complete sample for use with CAPI clusters.
+# Reference from KubeadmControlPlane.machineTemplate.infrastructureRef or
+# MachineDeployment.template.spec.infrastructureRef.
+# v1alpha1 is deprecated; prefer v1alpha2. Removal planned August 2026.
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: MicrovmMachineTemplate
+metadata:
+  name: microvmmachinetemplate-sample
+  # When used by a cluster, add: labels: cluster.x-k8s.io/cluster-name: "<cluster-name>"
+spec:
+  template:
+    spec:
+      vcpu: 2
+      memoryMb: 2048
+      rootVolume:
+        id: root
+        image: ghcr.io/liquidmetal-dev/capmvm-kubernetes:1.23.5
+      kernel:
+        filename: boot/vmlinux
+        image: ghcr.io/liquidmetal-dev/kernel-bin:5.10.77
+      volumes:
+        - id: modules
+          image: ghcr.io/liquidmetal-dev/kernel-modules:5.10.77
+          mountPoint: /lib/modules/5.10.77
+      kernelCmdline: {}
+      networkInterfaces:
+        - guestDeviceName: eth1
+          type: macvtap
+      # sshPublicKeys: []
